@@ -11,11 +11,11 @@ import (
 )
 
 type Collection struct {
-	Name   string         `json:"name"`
-	Fields []fields.Field `json:"fields"`
+	Name   string               `json:"name"`
+	Fields []fields.SchemaField `json:"fields"`
 }
 
-func New(Name string, fs ...fields.Field) *Collection {
+func New(Name string, fs ...fields.SchemaField) *Collection {
 	c := Collection{
 		Name:   Name,
 		Fields: fs,
@@ -23,15 +23,15 @@ func New(Name string, fs ...fields.Field) *Collection {
 	return &c
 }
 
-func (c *Collection) AddField(f fields.Field) {
+func (c *Collection) AddField(f fields.SchemaField) {
 	c.Fields = append(c.Fields, f)
 }
 
 func (c *Collection) CreateType() reflect.Type {
 	f := make([]reflect.StructField, 0)
 	for i := range c.Fields {
-		t := c.Fields[i].Type()
-		n := c.Fields[i].GetName()
+		t := c.Fields[i].Type
+		n := c.Fields[i].Name
 
 		switch t {
 		case "TEXT":

@@ -22,34 +22,19 @@ func TestNew(t *testing.T) {
 }
 
 func TestAddField(t *testing.T) {
-	c := collections.New("testcollections")
-	if len(c.Fields) != 0 {
-		t.Errorf("expected Fields length to be 0 initially, got %d", len(c.Fields))
-	}
-
 	// Add a dummy field
-	f := fields.TEXT{}
-	f.SetName("DummyValue")
-	c.AddField(&f)
+	f := fields.NewSchemaField("DummyValue", "TEXT", true, "")
+	c := collections.New("testcollections", *f)
 	if len(c.Fields) != 1 {
 		t.Errorf("expected Fields length to be 1 after adding a field, got %d", len(c.Fields))
 	}
 }
 
 func TestCreateType(t *testing.T) {
-	c := collections.New("testcollections")
-	if len(c.Fields) != 0 {
-		t.Errorf("expected Fields length to be 0 initially, got %d", len(c.Fields))
-	}
-
 	// Add a dummy field
-	f := fields.TEXT{}
-	f.SetName("DummyText")
-	c.AddField(&f)
-	// Add a dummy field
-	n := fields.NUMBER{}
-	n.SetName("DummyNumber")
-	c.AddField(&n)
+	f := fields.NewSchemaField("DummyText", "TEXT", true, "")
+	n := fields.NewSchemaField("DummyNumber", "NUMBER", true, "")
+	c := collections.New("testcollections", *f, *n)
 	if len(c.Fields) != 2 {
 		t.Errorf("expected Fields length to be 1 after adding a field, got %d", len(c.Fields))
 	}
@@ -58,14 +43,10 @@ func TestCreateType(t *testing.T) {
 }
 
 func TestCreate(t *testing.T) {
-	c := collections.New("testcollections")
-	f := fields.TEXT{}
-	f.SetName("DummyText")
-	c.AddField(&f)
-	n := fields.NUMBER{}
-	n.SetName("DummyNumber")
-	c.AddField(&n)
+	f := fields.NewSchemaField("DummyText", "TEXT", true, "")
+	n := fields.NewSchemaField("DummyNumber", "NUMBER", true, "")
 
+	c := collections.New("testcollections", *f, *n)
 	j := `
   {
   "DummyText": "hello world",
@@ -95,13 +76,10 @@ func TestCreate(t *testing.T) {
 
 func TestDBInit(t *testing.T) {
 	database.InitSqlite()
-	c := collections.New("testcollections")
-	f := fields.TEXT{}
-	f.SetName("DummyText")
-	c.AddField(&f)
-	n := fields.NUMBER{}
-	n.SetName("DummyNumber")
-	c.AddField(&n)
+	f := fields.NewSchemaField("DummyText", "TEXT", true, "")
+	n := fields.NewSchemaField("DummyNumber", "NUMBER", true, "")
+
+	c := collections.New("testcollections", *f, *n)
 
 	err := c.DBInit()
 	if err != nil {
