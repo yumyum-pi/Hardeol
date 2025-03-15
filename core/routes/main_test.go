@@ -9,7 +9,7 @@ import (
 
 func TestDynamicRouter_HandleAndServeHTTP(t *testing.T) {
 	// Create a new router instance
-	router := routes.New()
+	router := routes.NewDynamicRouter()
 
 	// Register routes
 	router.Handle("/", func(w http.ResponseWriter, r *http.Request) {

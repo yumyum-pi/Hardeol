@@ -7,8 +7,9 @@ import (
 )
 
 func main() {
+	// Create new dynamic router
+	r := routes.NewDynamicRouter()
 	// Create a new server instance.
-	r := routes.New()
 	srv := server.New(":8080", r)
 
 	// Start serving. ListenAndServe will block.

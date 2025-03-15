@@ -11,7 +11,7 @@ import (
 
 func TestServer_AddRouteWhileServing(t *testing.T) {
 	// Create a new Server instance.
-	r := routes.New()
+	r := routes.NewDynamicRouter()
 	s := server.New(":8080", r)
 
 	// Start the server in a separate goroutine.
