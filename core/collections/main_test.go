@@ -16,30 +16,30 @@ func TestNew(t *testing.T) {
 	if c.Name != name {
 		t.Errorf("expected Names to be %q, got %q", name, c.Name)
 	}
-	if len(c.List) != 0 {
-		t.Errorf("expected initial List length to be 0, got %d", len(c.List))
+	if len(c.Fields) != 0 {
+		t.Errorf("expected initial List length to be 0, got %d", len(c.Fields))
 	}
 }
 
 func TestAddField(t *testing.T) {
 	c := collections.New("testcollections")
-	if len(c.List) != 0 {
-		t.Errorf("expected List length to be 0 initially, got %d", len(c.List))
+	if len(c.Fields) != 0 {
+		t.Errorf("expected Fields length to be 0 initially, got %d", len(c.Fields))
 	}
 
 	// Add a dummy field
 	f := fields.TEXT{}
 	f.SetName("DummyValue")
 	c.AddField(&f)
-	if len(c.List) != 1 {
-		t.Errorf("expected List length to be 1 after adding a field, got %d", len(c.List))
+	if len(c.Fields) != 1 {
+		t.Errorf("expected Fields length to be 1 after adding a field, got %d", len(c.Fields))
 	}
 }
 
 func TestCreateType(t *testing.T) {
 	c := collections.New("testcollections")
-	if len(c.List) != 0 {
-		t.Errorf("expected List length to be 0 initially, got %d", len(c.List))
+	if len(c.Fields) != 0 {
+		t.Errorf("expected Fields length to be 0 initially, got %d", len(c.Fields))
 	}
 
 	// Add a dummy field
@@ -50,8 +50,8 @@ func TestCreateType(t *testing.T) {
 	n := fields.NUMBER{}
 	n.SetName("DummyNumber")
 	c.AddField(&n)
-	if len(c.List) != 2 {
-		t.Errorf("expected List length to be 1 after adding a field, got %d", len(c.List))
+	if len(c.Fields) != 2 {
+		t.Errorf("expected Fields length to be 1 after adding a field, got %d", len(c.Fields))
 	}
 
 	c.CreateType()

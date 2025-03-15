@@ -2,11 +2,17 @@ package main
 
 import (
 	"log"
+	"yumyum-pi/Hardeol/core/database"
 	"yumyum-pi/Hardeol/core/routes"
 	"yumyum-pi/Hardeol/core/server"
 )
 
 func main() {
+	database.InitSqlite()
+
+	// Create New Collections
+	// Get Collection data from the database
+
 	// Create new dynamic router
 	r := routes.NewDynamicRouter()
 	// Create a new server instance.

@@ -11,36 +11,27 @@ import (
 )
 
 type Collection struct {
-	Name      string
-	ID        [8]byte
-	List      []fields.Field
-	tableName string
+	Name   string         `json:"name"`
+	Fields []fields.Field `json:"fields"`
 }
 
 func New(Name string, fs ...fields.Field) *Collection {
-	tableName := utils.ToSnakeUnsafe(Name)
 	c := Collection{
-		Name:      Name,
-		List:      fs,
-		tableName: tableName,
+		Name:   Name,
+		Fields: fs,
 	}
-	copy(c.ID[:], utils.RandName(8))
 	return &c
 }
 
-func (c *Collection) TableName() string {
-	return c.tableName
-}
-
 func (c *Collection) AddField(f fields.Field) {
-	c.List = append(c.List, f)
+	c.Fields = append(c.Fields, f)
 }
 
 func (c *Collection) CreateType() reflect.Type {
 	f := make([]reflect.StructField, 0)
-	for i := range c.List {
-		t := c.List[i].Type()
-		n := c.List[i].GetName()
+	for i := range c.Fields {
+		t := c.Fields[i].Type()
+		n := c.Fields[i].GetName()
 
 		switch t {
 		case "TEXT":
@@ -78,7 +69,7 @@ func (c *Collection) DBInit() error {
 	t := c.CreateType()
 	v := reflect.New(t).Interface()
 	db := database.Get()
-	err := db.Table(c.tableName).AutoMigrate(v)
+	err := db.Table(c.Name).AutoMigrate(v)
 	if err != nil {
 		return err
 	}
