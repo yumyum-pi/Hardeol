@@ -7,7 +7,6 @@ import (
 	"testing"
 	"yumyum-pi/Hardeol/core/collections"
 	"yumyum-pi/Hardeol/core/database"
-	"yumyum-pi/Hardeol/core/fields"
 )
 
 func TestNew(t *testing.T) {
@@ -23,7 +22,7 @@ func TestNew(t *testing.T) {
 
 func TestAddField(t *testing.T) {
 	// Add a dummy field
-	f := fields.NewSchemaField("DummyValue", "TEXT", true, "")
+	f := collections.NewSchemaField("DummyValue", "TEXT", true, "")
 	c := collections.New("testcollections", *f)
 	if len(c.Fields) != 1 {
 		t.Errorf("expected Fields length to be 1 after adding a field, got %d", len(c.Fields))
@@ -32,8 +31,8 @@ func TestAddField(t *testing.T) {
 
 func TestCreateType(t *testing.T) {
 	// Add a dummy field
-	f := fields.NewSchemaField("DummyText", "TEXT", true, "")
-	n := fields.NewSchemaField("DummyNumber", "NUMBER", true, "")
+	f := collections.NewSchemaField("DummyText", "TEXT", true, "")
+	n := collections.NewSchemaField("DummyNumber", "NUMBER", true, "")
 	c := collections.New("testcollections", *f, *n)
 	if len(c.Fields) != 2 {
 		t.Errorf("expected Fields length to be 1 after adding a field, got %d", len(c.Fields))
@@ -43,8 +42,8 @@ func TestCreateType(t *testing.T) {
 }
 
 func TestCreate(t *testing.T) {
-	f := fields.NewSchemaField("DummyText", "TEXT", true, "")
-	n := fields.NewSchemaField("DummyNumber", "NUMBER", true, "")
+	f := collections.NewSchemaField("DummyText", "TEXT", true, "")
+	n := collections.NewSchemaField("DummyNumber", "NUMBER", true, "")
 
 	c := collections.New("testcollections", *f, *n)
 	j := `
@@ -76,8 +75,8 @@ func TestCreate(t *testing.T) {
 
 func TestDBInit(t *testing.T) {
 	database.InitSqlite()
-	f := fields.NewSchemaField("DummyText", "TEXT", true, "")
-	n := fields.NewSchemaField("DummyNumber", "NUMBER", true, "")
+	f := collections.NewSchemaField("DummyText", "TEXT", true, "")
+	n := collections.NewSchemaField("DummyNumber", "NUMBER", true, "")
 
 	c := collections.New("testcollections", *f, *n)
 

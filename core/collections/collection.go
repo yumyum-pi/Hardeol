@@ -6,16 +6,16 @@ import (
 	"io"
 	"reflect"
 	"yumyum-pi/Hardeol/core/database"
-	"yumyum-pi/Hardeol/core/fields"
 	"yumyum-pi/Hardeol/utils"
 )
 
 type Collection struct {
-	Name   string               `json:"name"`
-	Fields []fields.SchemaField `json:"fields"`
+	ID     int           `json:"id" gorm:"primaryKey;unique,autoIncrement"`
+	Name   string        `json:"name"`
+	Fields []SchemaField `json:"fields" gorm:"foreignKey:CollectionID;constraint:OnDelete:CASCADE;"`
 }
 
-func New(Name string, fs ...fields.SchemaField) *Collection {
+func New(Name string, fs ...SchemaField) *Collection {
 	c := Collection{
 		Name:   Name,
 		Fields: fs,
@@ -23,7 +23,7 @@ func New(Name string, fs ...fields.SchemaField) *Collection {
 	return &c
 }
 
-func (c *Collection) AddField(f fields.SchemaField) {
+func (c *Collection) AddField(f SchemaField) {
 	c.Fields = append(c.Fields, f)
 }
 

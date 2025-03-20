@@ -1,15 +1,15 @@
-package fields_test
+package collections_test
 
 import (
 	"encoding/json"
 	"reflect"
 	"testing"
-	"yumyum-pi/Hardeol/core/fields"
+	"yumyum-pi/Hardeol/core/collections"
 )
 
 // TestSchemaFieldJSONMarshalling tests that a SchemaField with all fields set is marshalled correctly.
 func TestSchemaFieldJSONMarshalling(t *testing.T) {
-	field := fields.SchemaField{
+	field := collections.SchemaField{
 		Name:     "email",
 		Type:     "string",
 		Required: true,
@@ -29,7 +29,7 @@ func TestSchemaFieldJSONMarshalling(t *testing.T) {
 
 // TestSchemaFieldJSONOmitEmpty tests that an empty Regex field is omitted during marshalling.
 func TestSchemaFieldJSONOmitEmpty(t *testing.T) {
-	field := fields.SchemaField{
+	field := collections.SchemaField{
 		Name:     "age",
 		Type:     "number",
 		Required: false,
@@ -50,12 +50,12 @@ func TestSchemaFieldJSONOmitEmpty(t *testing.T) {
 // TestSchemaFieldJSONUnmarshal tests that a JSON string is correctly unmarshalled into a SchemaField.
 func TestSchemaFieldJSONUnmarshal(t *testing.T) {
 	jsonData := `{"name":"username","type":"string","required":true,"regex":"^\\w+$"}`
-	var field fields.SchemaField
+	var field collections.SchemaField
 	if err := json.Unmarshal([]byte(jsonData), &field); err != nil {
 		t.Fatalf("Error unmarshalling JSON into SchemaField: %v", err)
 	}
 
-	expected := fields.SchemaField{
+	expected := collections.SchemaField{
 		Name:     "username",
 		Type:     "string",
 		Required: true,
