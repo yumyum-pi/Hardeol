@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"io"
 	"reflect"
-	"yumyum-pi/Hardeol/core/database"
 	"yumyum-pi/Hardeol/utils"
+
+	"gorm.io/gorm"
 )
 
 type Collection struct {
@@ -29,9 +30,10 @@ func (c *Collection) AddField(f SchemaField) {
 
 func (c *Collection) CreateType() reflect.Type {
 	f := make([]reflect.StructField, 0)
+	// TODO: add  validation
 	for i := range c.Fields {
 		t := c.Fields[i].Type
-		n := c.Fields[i].Name
+		n := utils.CapFirstChar(c.Fields[i].Name)
 
 		switch t {
 		case "TEXT":
@@ -65,14 +67,12 @@ func (c *Collection) Create(body io.Reader) (any, error) {
 	return v, nil
 }
 
-func (c *Collection) DBInit() error {
+func (c *Collection) DBInit(db *gorm.DB) error {
 	t := c.CreateType()
 	v := reflect.New(t).Interface()
-	db := database.Get()
-	err := db.Table(c.Name).AutoMigrate(v)
+	err := db.Debug().Table(c.Name).AutoMigrate(v)
 	if err != nil {
 		return err
 	}
-
 	return nil
 }

@@ -74,3 +74,14 @@ func BenchmarkToSnakeUnsafe(b *testing.B) {
 		}
 	}
 }
+
+func TestToCamelCase(t *testing.T) {
+	for _, tt := range tests {
+		input := tt.expected
+		expected := tt.input
+		result := utils.ToCamelCase(input)
+		if result != expected {
+			t.Errorf("ToSnake(%q) = %q; want %q", input, result, expected)
+		}
+	}
+}

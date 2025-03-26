@@ -17,17 +17,26 @@ func Init() http.HandlerFunc {
 
 	db := database.Get()
 	c = make([]Collection, 0)
-	res := db.Find(&c)
+	res := db.Preload("Fields").Find(&c)
 	if res.Error != nil {
 		logger.Error.Println(res.Error.Error())
 	}
 
-	fmt.Println(c)
+	// loop over all the collections
+	// create the tables if it does not exist
+	for i := range c {
+		err := c[i].DBInit(db)
+		if err != nil {
+			logger.Error.Println(err)
+		}
+	}
+
 	// return the handler
 	// CRUD for Collection
 	return handlerFunc
 }
 
+// TODO: Add an auth middleware only the admin should be able to view
 func handlerFunc(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:

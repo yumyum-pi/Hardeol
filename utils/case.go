@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"strings"
 	"unsafe"
 )
 
@@ -55,4 +56,64 @@ func ToSnakeUnsafe(camel string) string {
 	}
 	// Use unsafe conversion to avoid copying the byte slice
 	return *(*string)(unsafe.Pointer(&buf))
+}
+
+func ToCamelCase(input string) string {
+	if input == "" {
+		return ""
+	}
+	parts := strings.Split(input, "_")
+	for i, part := range parts {
+		if len(part) > 0 {
+			parts[i] = strings.ToUpper(part[:1]) + strings.ToLower(part[1:])
+		}
+	}
+	return strings.Join(parts, "")
+}
+
+const diff byte = 32
+
+func ToCamelCase2(input string) string {
+	if input == "" {
+		return ""
+	}
+
+	l := len(input)
+	s := make([]byte, 0, l)
+	underscore := false
+	j := 0
+	for i := 0; i < l; i++ {
+		ic := input[i]
+		if ic == '_' {
+			underscore = true
+			continue
+		}
+
+		if underscore {
+			s[j] = ic - diff
+			underscore = false
+		} else {
+			s[j] = ic
+		}
+		j += 1
+
+	}
+	return string(s)
+}
+
+func CapFirstChar(input string) string {
+	// check if the input is empty
+	if input == "" {
+		return input
+	}
+	// convert to runes for unicode safty
+	r := []rune(input)
+	// check if lowercase
+	if r[0] >= 'a' && r[0] <= 'z' {
+		// convert to uppercase
+		r[0] -= 32
+		return string(r)
+	}
+
+	return input
 }

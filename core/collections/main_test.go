@@ -38,7 +38,15 @@ func TestCreateType(t *testing.T) {
 		t.Errorf("expected Fields length to be 1 after adding a field, got %d", len(c.Fields))
 	}
 
-	c.CreateType()
+	tp := c.CreateType()
+
+	if _, b := tp.FieldByName("DummyText"); !b {
+		t.Errorf("DummyText does not exisit\n")
+	}
+
+	if _, b := tp.FieldByName("DummyNumber"); !b {
+		t.Errorf("DummyNumber does not exisit\n")
+	}
 }
 
 func TestCreate(t *testing.T) {
@@ -73,14 +81,17 @@ func TestCreate(t *testing.T) {
 	}
 }
 
+// TODO: test the DB Init function
+
 func TestDBInit(t *testing.T) {
 	database.InitSqlite()
 	f := collections.NewSchemaField("DummyText", "TEXT", true, "")
 	n := collections.NewSchemaField("DummyNumber", "NUMBER", true, "")
 
+	db := database.Get()
 	c := collections.New("testcollections", *f, *n)
 
-	err := c.DBInit()
+	err := c.DBInit(db)
 	if err != nil {
 		t.Error(err)
 	}
