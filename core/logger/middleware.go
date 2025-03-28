@@ -34,6 +34,6 @@ func Middleware(h http.HandlerFunc) http.HandlerFunc {
 		ip := r.RemoteAddr
 
 		// Log the details.
-		Info.Printf("%d %v %s %s", lrw.statusCode, l, ip, r.URL.Path)
+		Info.Printf("%d %v %s %s %s", lrw.statusCode, l, ip, r.Method, r.URL.Path)
 	})
 }
