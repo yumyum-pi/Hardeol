@@ -70,7 +70,7 @@ func (c *Collection) Create(body io.Reader) (any, error) {
 func (c *Collection) DBInit(db *gorm.DB) error {
 	t := c.CreateType()
 	v := reflect.New(t).Interface()
-	err := db.Debug().Table(c.Name).AutoMigrate(v)
+	err := db.Table(c.Name).AutoMigrate(v)
 	if err != nil {
 		return err
 	}
