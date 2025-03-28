@@ -11,13 +11,13 @@ import (
 func main() {
 	database.InitSqlite()
 
-	// Create New Collections
-	// Get Collection data from the database
-	h := collections.Init()
-
 	// Create new dynamic router
 	r := routes.NewDynamicRouter()
-	r.Handle("/collection/", h)
+
+	// Create New Collections
+	// Get Collection data from the database
+	collections.Init(r)
+
 	// Create a new server instance.
 	srv := server.New(":8080", r)
 
