@@ -11,10 +11,17 @@ type DynamicRouter struct {
 	mu     sync.RWMutex
 }
 
-func NewDynamicRouter() *DynamicRouter {
-	return &DynamicRouter{
+var dr DynamicRouter
+
+func Init() *DynamicRouter {
+	dr = DynamicRouter{
 		routes: make(map[string]http.HandlerFunc),
 	}
+	return &dr
+}
+
+func Get() *DynamicRouter {
+	return &dr
 }
 
 // Handle registers a new route with its corresponding handler.

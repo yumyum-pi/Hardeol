@@ -12,7 +12,7 @@ func main() {
 	database.InitSqlite()
 
 	// Create new dynamic router
-	r := routes.NewDynamicRouter()
+	r := routes.Init()
 
 	// Create New Collections
 	// Get Collection data from the database

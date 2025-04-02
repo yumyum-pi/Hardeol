@@ -9,14 +9,18 @@ import (
 
 func TestDynamicRouter_HandleAndServeHTTP(t *testing.T) {
 	// Create a new router instance
-	router := routes.NewDynamicRouter()
+	router := routes.Init()
 
 	// Register routes
 	router.Handle("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("Welcome to the homepage!"))
+		if _, err := w.Write([]byte("Welcome to the homepage!")); err != nil {
+			t.Fatalf("Unable to write the response: %s", err.Error())
+		}
 	})
 	router.Handle("/about", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("About page"))
+		if _, err := w.Write([]byte("About page")); err != nil {
+			t.Fatalf("Unable to write the response: %s", err.Error())
+		}
 	})
 
 	// Test for the root route

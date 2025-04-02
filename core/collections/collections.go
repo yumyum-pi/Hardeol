@@ -8,6 +8,8 @@ import (
 	"yumyum-pi/Hardeol/core/database"
 	"yumyum-pi/Hardeol/core/logger"
 	"yumyum-pi/Hardeol/core/routes"
+
+	"gorm.io/gorm"
 )
 
 var c []Collection
@@ -23,84 +25,47 @@ func Init(r *routes.DynamicRouter) {
 	if res.Error != nil {
 		logger.Error.Println(res.Error.Error())
 	}
-	r.Handle("/collection/", handlerFunc)
+	r.Handle("/collection/", collectionsHandlerFunc)
+	CollectionNameInit()
 
 	// loop over all the collections
 	// create the tables if it does not exist
 	for i := range c {
 		cc := c[i]
-		err := cc.DBInit(db)
-		if err != nil {
-			logger.Error.Println(err)
-		}
 		// CRUD for Collection
-		h := CRUDRouter(&cc)
-		r.Handle(
-			fmt.Sprintf("/%s/", cc.Name),
-			h,
+		newCollection(cc, db, r)
+	}
+}
+
+func newCollection(cc Collection, db *gorm.DB, r *routes.DynamicRouter) {
+	if CollectionNameExists(cc.Name) {
+		logger.Error.Println("duplicate name: ", cc.Name)
+		return
+	}
+
+	CollectionNameAdd(cc.Name)
+	err := cc.DBInit(db)
+	if err != nil {
+		logger.Error.Println(err)
+	}
+
+	h := CRUDRouter(&cc)
+	// TODO: why does this stops the processing when not making a gorotine
+	for i := range h {
+		go r.Handle(
+			fmt.Sprintf("%s /%s/%s", h[i].method, cc.Name, h[i].path),
+			h[i].handler,
 		)
 	}
 }
 
-// TODO: Add an auth middleware only the admin should be able to view
-func handlerFunc(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodGet:
-		handleList(w, r)
-	case http.MethodPost:
-		handleCreate(w, r)
-	default:
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-	}
+type crudRouterReturnType struct {
+	method  string
+	path    string
+	handler http.HandlerFunc
 }
 
-func handleList(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-
-	list := make([]Collection, 0)
-
-	db := database.Get()
-	res := db.Preload("Fields").Find(&list)
-	if res.Error != nil {
-		fmt.Println("erorr", res.Error.Error())
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	err := json.NewEncoder(w).Encode(list)
-	if err != nil {
-		logger.Error.Print(err.Error())
-		fmt.Println("err:", err.Error())
-	}
-}
-
-func handleCreate(w http.ResponseWriter, r *http.Request) {
-	col := new(Collection)
-
-	if err := json.NewDecoder(r.Body).Decode(col); err != nil {
-		http.Error(w, "Invalid JSON input", http.StatusBadRequest)
-		return
-	}
-
-	// run validation
-
-	db := database.Get()
-	res := db.Create(col)
-
-	if res.Error != nil {
-		fmt.Println(res.Error.Error())
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	err := json.NewEncoder(w).Encode(col)
-	if err != nil {
-		logger.Error.Println(err.Error())
-	}
-}
-
-func CRUDRouter(c *Collection) http.HandlerFunc {
+func CRUDRouter(c *Collection) []crudRouterReturnType {
 	t := c.CreateType()
 
 	// handle list to collection
@@ -120,7 +85,6 @@ func CRUDRouter(c *Collection) http.HandlerFunc {
 			ResponseError(w, http.StatusInternalServerError, res.Error.Error())
 			return
 		}
-
 		ResponseOk(w, http.StatusOK, valSlice)
 	}
 
@@ -157,37 +121,41 @@ func CRUDRouter(c *Collection) http.HandlerFunc {
 			ResponseError(w, http.StatusBadRequest, "id not found")
 			return
 		}
+		db := database.Get()
+		res := db.Table(c.Name).Where("id = ?", id).Delete(nil)
+		if res.Error != nil {
+			// TODO: proper error check
+			ResponseError(w, http.StatusInternalServerError, res.Error.Error())
+			return
+		}
 
-		/*
-			db := database.Get()
-			res := db.Table(c.Name).Where("id = ?", id).Delete(nil)
-			if res.Error != nil {
-				// TODO: proper error check
-				ResponseError(w, http.StatusInternalServerError, res.Error.Error())
-				return
-			}
-
-			if res.RowsAffected == 0 {
-				// TODO: proper error check
-				ResponseError(w, http.StatusBadRequest, "Record not found")
-				return
-			}
-		*/
+		if res.RowsAffected == 0 {
+			// TODO: proper error check
+			ResponseError(w, http.StatusBadRequest, "Record not found")
+			return
+		}
 
 		ResponseOk(w, http.StatusOK, id)
 	}
 
-	// switch between different method
-	return func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case http.MethodGet:
-			handleList(w, r)
-		case http.MethodPost:
-			handleCreate(w, r)
-		case http.MethodDelete:
-			handleDelete(w, r)
-		default:
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		}
-	}
+	asdf := make([]crudRouterReturnType, 0)
+
+	asdf = append(asdf, crudRouterReturnType{
+		http.MethodGet,
+		"",
+		handleList,
+	})
+
+	asdf = append(asdf, crudRouterReturnType{
+		http.MethodPost,
+		"",
+		handleCreate,
+	})
+	asdf = append(asdf, crudRouterReturnType{
+		http.MethodDelete,
+		"{id}",
+		handleDelete,
+	})
+
+	return asdf
 }

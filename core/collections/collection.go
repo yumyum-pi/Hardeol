@@ -12,11 +12,14 @@ import (
 
 type Collection struct {
 	ID     int           `json:"id" gorm:"primaryKey;unique,autoIncrement"`
-	Name   string        `json:"name"`
+	Name   string        `json:"name" gorm:"unique"`
 	Fields []SchemaField `json:"fields" gorm:"foreignKey:CollectionID;constraint:OnDelete:CASCADE;"`
 }
 
+// New function will create a new collection
 func New(Name string, fs ...SchemaField) *Collection {
+	id := DefaultIDSchemeField()
+	fs = append(fs, id)
 	c := Collection{
 		Name:   Name,
 		Fields: fs,
