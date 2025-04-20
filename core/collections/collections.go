@@ -7,14 +7,14 @@ import (
 	"reflect"
 	"yumyum-pi/Hardeol/core/database"
 	"yumyum-pi/Hardeol/core/logger"
-	"yumyum-pi/Hardeol/core/routes"
+	"yumyum-pi/Hardeol/core/router"
 
 	"gorm.io/gorm"
 )
 
 var c []Collection
 
-func Init(r *routes.DynamicRouter) {
+func Init(r *router.DynamicRouter) {
 	// make the db call
 	database.Migrate(&SchemaField{})
 	database.Migrate(&Collection{})
@@ -37,7 +37,7 @@ func Init(r *routes.DynamicRouter) {
 	}
 }
 
-func newCollection(cc Collection, db *gorm.DB, r *routes.DynamicRouter) {
+func newCollection(cc Collection, db *gorm.DB, r *router.DynamicRouter) {
 	if CollectionNameExists(cc.Name) {
 		logger.Error.Println("duplicate name: ", cc.Name)
 		return

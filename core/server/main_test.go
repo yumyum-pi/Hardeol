@@ -5,13 +5,14 @@ import (
 	"net/http"
 	"testing"
 	"time"
-	"yumyum-pi/Hardeol/core/routes"
+	"yumyum-pi/Hardeol/core/router"
 	"yumyum-pi/Hardeol/core/server"
 )
 
 func TestServer_AddRouteWhileServing(t *testing.T) {
 	// Create a new Server instance.
-	r := routes.Init()
+	router.Init()
+	r := router.Get()
 	s := server.New(":8080", r)
 
 	// Start the server in a separate goroutine.

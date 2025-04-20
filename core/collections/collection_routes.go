@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"yumyum-pi/Hardeol/core/database"
 	"yumyum-pi/Hardeol/core/logger"
-	"yumyum-pi/Hardeol/core/routes"
+	"yumyum-pi/Hardeol/core/router"
 )
 
 // TODO: Add an auth middleware only the admin should be able to view
@@ -76,7 +76,7 @@ func collectionsHandleCreate(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(res.Error.Error())
 	}
 
-	rb := routes.Get()
+	rb := router.Get()
 	newCollection(*col, db, rb)
 	ResponseOk(w, http.StatusOK, col)
 }

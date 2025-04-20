@@ -3,24 +3,24 @@ package server
 import (
 	"fmt"
 	"net/http"
-	"yumyum-pi/Hardeol/core/routes"
+	"yumyum-pi/Hardeol/core/router"
 )
 
 type Server struct {
 	addr   string
-	routes *routes.DynamicRouter
+	router *router.DynamicRouter
 }
 
-func New(addr string, routes *routes.DynamicRouter) *Server {
+func New(addr string, routes *router.DynamicRouter) *Server {
 	return &Server{
 		addr:   addr,
-		routes: routes,
+		router: routes,
 	}
 }
 
 func (s *Server) Serve() error {
-	s.routes.Handle("/hardeol", hardeolHandler)
-	return http.ListenAndServe(s.addr, s.routes)
+	s.router.Handle("/hardeol", hardeolHandler)
+	return http.ListenAndServe(s.addr, s.router)
 }
 
 func hardeolHandler(w http.ResponseWriter, r *http.Request) {

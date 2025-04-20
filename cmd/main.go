@@ -4,7 +4,7 @@ import (
 	"log"
 	"yumyum-pi/Hardeol/core/collections"
 	"yumyum-pi/Hardeol/core/database"
-	"yumyum-pi/Hardeol/core/routes"
+	"yumyum-pi/Hardeol/core/router"
 	"yumyum-pi/Hardeol/core/server"
 )
 
@@ -12,7 +12,8 @@ func main() {
 	database.InitSqlite()
 
 	// Create new dynamic router
-	r := routes.Init()
+	router.Init()
+	r := router.Get()
 
 	// Create New Collections
 	// Get Collection data from the database
