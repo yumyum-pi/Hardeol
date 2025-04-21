@@ -39,6 +39,9 @@ var (
 	ErrNotRoot        = errors.New("not root")
 	// TODO:check of this error
 	ErrSegmentAfterWild = errors.New("segment after wild entry is not allowed")
+	ErrHandlerNotFound  = errors.New("handler not found")
+	ErrEmptyParam       = errors.New("empty param not allowed")
+	ErrEmptyWild        = errors.New("empty wild not allowed")
 )
 
 // TODO:
@@ -97,8 +100,14 @@ func (n *node) Add(url string, handle Handler) error {
 				switch char {
 				case '*':
 					nType = nodeTypeWild
+					if len(path) < 3 {
+						return ErrEmptyWild
+					}
 				case ':':
 					nType = nodeTypeParams
+					if len(path) < 3 {
+						return ErrEmptyParam
+					}
 				}
 			}
 			c := node{
@@ -122,13 +131,15 @@ func (n *node) Add(url string, handle Handler) error {
 	return nil
 }
 
-func (n *node) Get(url string) (Handler, bool) {
+func (n *node) Get(url string) (h Handler, allMatch bool, params map[string]string, err error) {
 	current := n
 	if current.nodeType != nodeTypeRoot {
-		// TODO: Throw Error
+		return nil, false, nil, ErrNotRoot
 	}
 
-	allMatch := true
+	params = make(map[string]string)
+
+	allMatch = true
 	endIndex := 0
 	startIndex := 0
 	lenUrl := len(url)
@@ -138,6 +149,9 @@ func (n *node) Get(url string) (Handler, bool) {
 	for endIndex < lenUrl {
 		endIndex = findSegmentEnd(url, startIndex)
 		path = url[startIndex:endIndex]
+		// store for param and wild name
+		s := startIndex
+		// change the startIndex for the next loop
 		startIndex = endIndex
 
 		// check if the current node has the path
@@ -146,23 +160,69 @@ func (n *node) Get(url string) (Handler, bool) {
 		}
 		found := false
 
+	matchLoop:
 		for _, c := range current.children {
-			if c.path == path {
+			// switch based on nodetype
+			switch c.nodeType {
+			case nodeTypeParams:
+				// store the value of param
+				extractParam(params, c, url, s, endIndex)
 				found = true
 				current = c
-				break
+				// checking if the last child
+				if endIndex >= lenUrl {
+					h = c.handler
+					// the last path should have a handler
+					if h == nil {
+						allMatch = false
+						err = ErrHandlerNotFound
+					}
+					return
+				}
+				break matchLoop
+			case nodeTypeWild:
+				endIndex = lenUrl
+				// store the value of wild
+				extractParam(params, c, url, s, endIndex)
+				params[c.path] = url[s:endIndex]
+				h = c.handler
+				if h == nil {
+					allMatch = false
+					err = ErrHandlerNotFound
+				}
+				return
+
+			default:
+				// handle the static node type
+				if c.path == path {
+					found = true
+					current = c
+					// checking if the last child
+					if endIndex >= lenUrl {
+						h = c.handler
+						// the last path should have a handler
+						if h == nil {
+							allMatch = false
+							err = ErrHandlerNotFound
+						}
+						return
+					}
+					break matchLoop
+				}
 			}
 		}
 
 		if !found {
 			allMatch = false
-			break
+			return
 		}
 	}
+	return
+}
 
-	if allMatch {
-		return nil, true
-	}
-
-	return nil, false
+func extractParam(params map[string]string, c *node, url string, s int, endIndex int) {
+	// for key remove the "/:" from path
+	// for value the "/" from path
+	// TODO: remove query params from the param value
+	params[c.path[2:]] = url[s+1 : endIndex]
 }

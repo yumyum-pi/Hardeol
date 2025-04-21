@@ -193,14 +193,14 @@ func TestNode(t *testing.T) {
 
 	// check the good cases
 	for _, c := range goodCase {
-		if _, ok := rootNode.Get(c); !ok {
+		if _, ok, _, _ := rootNode.Get(c); !ok {
 			t.Errorf("expecting to found: %s", c)
 		}
 	}
 
 	// check the good cases
 	for _, c := range badCase {
-		if _, ok := rootNode.Get(c); ok {
+		if _, ok, _, _ := rootNode.Get(c); ok {
 			t.Errorf("expecting not found: %s", c)
 		}
 	}
@@ -209,58 +209,127 @@ func TestNode(t *testing.T) {
 func TestNodeErrDuplicateRoute(t *testing.T) {
 	rootNode := CreateRootNode()
 
-	v := func(w http.ResponseWriter, r *http.Request) {
+	v := func(w http.ResponseWriter, r *http.Request) {}
+
+	tests := []struct {
+		name        string
+		route       string
+		expectError error
+	}{
+		{"Add unique route 1", "/v1/base/2", nil},
+		{"Add unique route 2", "/v1/base/2/3", nil},
+		{"Add duplicate route", "/v1/base/2", ErrDuplicateRoute},
 	}
 
-	case1 := "/v1/base/2"
-	case2 := "/v1/base/2/3"
-	case3 := "/v1/base/2"
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := rootNode.Add(tt.route, v)
 
-	e := rootNode.Add(case1, v)
-	if e != nil {
-		t.Errorf("case1: was not expecting error:%s", e.Error())
-	}
-
-	e = rootNode.Add(case2, v)
-	if e != nil {
-		t.Errorf("case2: was not expecting error:%s", e.Error())
-	}
-
-	e = rootNode.Add(case3, v)
-	if !errors.Is(e, ErrDuplicateRoute) {
-		t.Errorf("was expecting error but got nil")
+			if tt.expectError == nil {
+				if err != nil {
+					t.Errorf("unexpected error adding %q: %v", tt.route, err)
+				}
+			} else {
+				if !errors.Is(err, tt.expectError) {
+					t.Errorf("expected error %v for route %q, got: %v", tt.expectError, tt.route, err)
+				}
+			}
+		})
 	}
 }
 
 func TestNodeErrNotRoot(t *testing.T) {
 	rootNode := CreateRootNode()
 
-	v := func(w http.ResponseWriter, r *http.Request) {
+	v := func(w http.ResponseWriter, r *http.Request) {}
+
+	validRoutes := []string{
+		"/v1/base/2",
+		"/v1/base/2/3",
+		"/v1/base/3",
 	}
 
-	case1 := "/v1/base/2"
-	case2 := "/v1/base/2/3"
-	case3 := "/v1/base/3"
-
-	e := rootNode.Add(case1, v)
-	if e != nil {
-		t.Errorf("case1: was not expecting error:%s", e.Error())
+	for _, route := range validRoutes {
+		t.Run("Add to root: "+route, func(t *testing.T) {
+			if err := rootNode.Add(route, v); err != nil {
+				t.Errorf("unexpected error adding route %q to root: %v", route, err)
+			}
+		})
 	}
 
-	e = rootNode.Add(case2, v)
-	if e != nil {
-		t.Errorf("case2: was not expecting error:%s", e.Error())
+	t.Run("Add to non-root node", func(t *testing.T) {
+		child := rootNode.children[0]
+		if err := child.Add("/v1/base/2", v); !errors.Is(err, ErrNotRoot) {
+			t.Errorf("expected error %v when adding to non-root node, got: %v", ErrNotRoot, err)
+		}
+	})
+}
+
+func TestNodeErrEmptyParam(t *testing.T) {
+	rootNode := CreateRootNode()
+
+	v := func(w http.ResponseWriter, r *http.Request) {}
+
+	badRoute := "/v1/:/2"
+	goodRoute := "/v1/:a/2"
+
+	if err := rootNode.Add(badRoute, v); !errors.Is(err, ErrEmptyParam) {
+		t.Errorf("expected error %v when adding no name param node, got: %v", ErrEmptyParam, err)
 	}
 
-	e = rootNode.Add(case3, v)
-	if e != nil {
-		t.Errorf("case3: was not expecting error:%s", e.Error())
+	if err := rootNode.Add(goodRoute, v); err != nil {
+		t.Errorf("unexpected error %v when adding named param node", err)
+	}
+}
+
+func TestNodeErrEmptyWild(t *testing.T) {
+	rootNode := CreateRootNode()
+
+	v := func(w http.ResponseWriter, r *http.Request) {}
+
+	badRoute := "/v1/*/2"
+	goodRoute := "/v1/*a/2"
+
+	if err := rootNode.Add(badRoute, v); !errors.Is(err, ErrEmptyWild) {
+		t.Errorf("expected error %v when adding no name wild node, got: %v", ErrEmptyWild, err)
 	}
 
-	c := rootNode.children[0]
-	e = c.Add(case1, v)
-	if !errors.Is(e, ErrNotRoot) {
-		t.Errorf("was expecting NotRootErr but got nil")
+	if err := rootNode.Add(goodRoute, v); err != nil {
+		t.Errorf("unexpected error %v when adding named wild node", err)
+	}
+}
+
+func TestNodeGetParam(t *testing.T) {
+	rootNode := CreateRootNode()
+
+	v := func(w http.ResponseWriter, r *http.Request) {}
+	route := "/v1/:param1/:param2"
+
+	if err := rootNode.Add(route, v); err != nil {
+		t.Fatalf("unexpected error adding route %q: %v", route, err)
+	}
+
+	h, match, params, err := rootNode.Get("/v1/vivek/rawat")
+	if err != nil {
+		t.Fatalf("unexpected error on Get: %v", err)
+	}
+	if !match {
+		t.Fatalf("expected match to be true")
+	}
+	if params == nil {
+		t.Fatalf("expected params to be non-nil")
+	}
+	if len(params) != 2 {
+		t.Fatalf("expected 2 params, got %d", len(params))
+	}
+	if got := params["param1"]; got != "vivek" {
+		t.Errorf("expected param1 to be 'vivek', got %q", got)
+	}
+	if got := params["param2"]; got != "rawat" {
+		t.Errorf("expected param2 to be 'rawat', got %q", got)
+	}
+	if h == nil {
+		t.Fatalf("expected handler to be non-nil")
 	}
 }
 
