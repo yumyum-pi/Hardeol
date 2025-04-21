@@ -416,3 +416,31 @@ func BenchmarkNodeGet(b *testing.B) {
 		}
 	}
 }
+
+func TestNodePrint(t *testing.T) {
+	rootNode := CreateRootNode()
+
+	v := func(w http.ResponseWriter, r *http.Request) {
+	}
+
+	cases := []string{
+		"/v3",
+		"/v1/base1/sub-base1",
+		"/v1/base2/",
+		"/v2/base1",
+		"/v1/base1/sub-base2",
+		"/v1/base1/sub-base3/:name",
+		"/v1/base2/sub-base3/*wild",
+		"/v1/base2/sub-base4/based-4",
+	}
+
+	// add the goodcase
+	for _, c := range cases {
+		err := rootNode.Add(c, v)
+		if err != nil {
+			t.Fatalf("unexpected err %v when adding url:%s", err, c)
+		}
+	}
+
+	rootNode.print()
+}

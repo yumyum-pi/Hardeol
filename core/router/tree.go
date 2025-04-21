@@ -2,7 +2,9 @@ package router
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
+	"strings"
 )
 
 type nodeType uint8
@@ -45,8 +47,7 @@ var (
 )
 
 // TODO:
-// check priority for same level of children node
-// When error, how to correct the newely created child
+// Check priority for same level of children node
 func (n *node) Add(url string, handle Handler) error {
 	current := n
 	if current.nodeType != nodeTypeRoot {
@@ -218,6 +219,56 @@ func (n *node) Get(url string) (h Handler, allMatch bool, params map[string]stri
 		}
 	}
 	return
+}
+
+// TODO: create print function
+func (n *node) print() {
+	if n.nodeType != nodeTypeRoot {
+		return
+	}
+
+	rows := addToRow(n, -1)
+
+	for _, r := range rows {
+
+		prefix := ""
+		if r.level == 1 {
+			prefix = "|-"
+		} else if r.level > 1 {
+			prefix = strings.Repeat("|  ", r.level-2)
+			prefix = fmt.Sprintf("%s|- ", prefix)
+		}
+		path := fmt.Sprintf("%s%s", prefix, r.path)
+		fmt.Printf("%-20s | %d | %d | %v\n", path, r.level, r.nodeType, r.handler)
+	}
+}
+
+type printRow struct {
+	path     string
+	nodeType nodeType
+	handler  bool
+	level    int
+}
+
+func addToRow(n *node, parentLevel int) []printRow {
+	// add to the rows
+	level := parentLevel + 1
+
+	rows := make([]printRow, 0)
+
+	p := printRow{
+		path:     n.path,
+		nodeType: n.nodeType,
+		handler:  n.handler != nil,
+		level:    level,
+	}
+	rows = append(rows, p)
+
+	// loop each children
+	for _, c := range n.children {
+		rows = append(rows, addToRow(c, level)...)
+	}
+	return rows
 }
 
 func extractParam(params map[string]string, c *node, url string, s int, endIndex int) {
