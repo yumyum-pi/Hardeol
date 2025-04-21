@@ -35,7 +35,7 @@ func CreateRootNode() *node {
 }
 
 var (
-	ErrDuplidateRoute = errors.New("duplicate path not allowed")
+	ErrDuplicateRoute = errors.New("duplicate path not allowed")
 	ErrNotRoot        = errors.New("not root")
 	// TODO:check of this error
 	ErrSegmentAfterWild = errors.New("segment after wild entry is not allowed")
@@ -79,7 +79,7 @@ func (n *node) Add(url string, handle Handler) error {
 				// check if the last path
 				if endIndex >= lenUrl {
 					if c.handler != nil {
-						return ErrDuplidateRoute
+						return ErrDuplicateRoute
 					}
 					c.handler = handle
 				}

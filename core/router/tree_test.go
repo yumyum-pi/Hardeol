@@ -1,6 +1,7 @@
 package router
 
 import (
+	"errors"
 	"net/http"
 	"testing"
 )
@@ -205,7 +206,7 @@ func TestNode(t *testing.T) {
 	}
 }
 
-func TestNodeDuplicateErr(t *testing.T) {
+func TestNodeErrDuplicateRoute(t *testing.T) {
 	rootNode := CreateRootNode()
 
 	v := func(w http.ResponseWriter, r *http.Request) {
@@ -226,12 +227,12 @@ func TestNodeDuplicateErr(t *testing.T) {
 	}
 
 	e = rootNode.Add(case3, v)
-	if e == nil {
+	if !errors.Is(e, ErrDuplicateRoute) {
 		t.Errorf("was expecting error but got nil")
 	}
 }
 
-func TestNodeNotRootErr(t *testing.T) {
+func TestNodeErrNotRoot(t *testing.T) {
 	rootNode := CreateRootNode()
 
 	v := func(w http.ResponseWriter, r *http.Request) {
@@ -258,7 +259,7 @@ func TestNodeNotRootErr(t *testing.T) {
 
 	c := rootNode.children[0]
 	e = c.Add(case1, v)
-	if e == nil {
+	if !errors.Is(e, ErrNotRoot) {
 		t.Errorf("was expecting NotRootErr but got nil")
 	}
 }
