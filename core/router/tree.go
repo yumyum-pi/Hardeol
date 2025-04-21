@@ -42,9 +42,8 @@ var (
 )
 
 // TODO:
-// check for node type
 // check priority for same level of children node
-// When error how to correct the entered part
+// When error, how to correct the newely created child
 func (n *node) Add(url string, handle Handler) error {
 	current := n
 	if current.nodeType != nodeTypeRoot {
@@ -91,10 +90,21 @@ func (n *node) Add(url string, handle Handler) error {
 		if !found {
 			// path does not exist in the children
 			// append a new children with path
+
+			nType := nodeTypeStatic
+			if len(path) > 1 {
+				char := path[1]
+				switch char {
+				case '*':
+					nType = nodeTypeWild
+				case ':':
+					nType = nodeTypeParams
+				}
+			}
 			c := node{
 				path:     path,
 				children: make([]*node, 0),
-				nodeType: nodeTypeStatic, // TODO:need to check the type
+				nodeType: nType,
 				handler:  nil,
 			}
 

@@ -264,6 +264,64 @@ func TestNodeErrNotRoot(t *testing.T) {
 	}
 }
 
+func TestNodeType(t *testing.T) {
+	rootNode := CreateRootNode()
+
+	v := func(w http.ResponseWriter, r *http.Request) {}
+
+	tests := []struct {
+		name         string
+		route        string
+		expectedType nodeType
+		expectedPath string
+	}{
+		{
+			name:         "Static",
+			route:        "/v1/base1/2",
+			expectedType: nodeTypeStatic,
+			expectedPath: "/2",
+		},
+		{
+			name:         "Static",
+			route:        "/v1/base2/",
+			expectedType: nodeTypeStatic,
+			expectedPath: "/",
+		},
+		{
+			name:         "Param",
+			route:        "/v1/base3/:asdf",
+			expectedType: nodeTypeParams,
+			expectedPath: "/:asdf",
+		},
+		{
+			name:         "Wildcard",
+			route:        "/v1/base4/*sdfasf",
+			expectedType: nodeTypeWild,
+			expectedPath: "/*sdfasf",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := rootNode.Add(tt.route, v)
+			if err != nil {
+				t.Fatalf("%s: unexpected error: %v", tt.name, err)
+			}
+
+			// Traverse to the leaf node (assuming depth = 3)
+			testNode := rootNode.children[0].children[len(rootNode.children[0].children)-1].children[0]
+
+			if testNode.nodeType != tt.expectedType {
+				t.Errorf("%s: expected nodeType=%v, got %v", tt.name, tt.expectedType, testNode.nodeType)
+			}
+
+			if tt.expectedPath != "" && testNode.path != tt.expectedPath {
+				t.Errorf("%s: expected path=%s, got %s", tt.name, tt.expectedPath, testNode.path)
+			}
+		})
+	}
+}
+
 func BenchmarkNodeGet(b *testing.B) {
 	goodCase := staticRoutes
 
