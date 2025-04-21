@@ -205,6 +205,64 @@ func TestNode(t *testing.T) {
 	}
 }
 
+func TestNodeDuplicateErr(t *testing.T) {
+	rootNode := CreateRootNode()
+
+	v := func(w http.ResponseWriter, r *http.Request) {
+	}
+
+	case1 := "/v1/base/2"
+	case2 := "/v1/base/2/3"
+	case3 := "/v1/base/2"
+
+	e := rootNode.Add(case1, v)
+	if e != nil {
+		t.Errorf("case1: was not expecting error:%s", e.Error())
+	}
+
+	e = rootNode.Add(case2, v)
+	if e != nil {
+		t.Errorf("case2: was not expecting error:%s", e.Error())
+	}
+
+	e = rootNode.Add(case3, v)
+	if e == nil {
+		t.Errorf("was expecting error but got nil")
+	}
+}
+
+func TestNodeNotRootErr(t *testing.T) {
+	rootNode := CreateRootNode()
+
+	v := func(w http.ResponseWriter, r *http.Request) {
+	}
+
+	case1 := "/v1/base/2"
+	case2 := "/v1/base/2/3"
+	case3 := "/v1/base/3"
+
+	e := rootNode.Add(case1, v)
+	if e != nil {
+		t.Errorf("case1: was not expecting error:%s", e.Error())
+	}
+
+	e = rootNode.Add(case2, v)
+	if e != nil {
+		t.Errorf("case2: was not expecting error:%s", e.Error())
+	}
+
+	e = rootNode.Add(case3, v)
+	if e != nil {
+		t.Errorf("case3: was not expecting error:%s", e.Error())
+	}
+
+	c := rootNode.children[0]
+	e = c.Add(case1, v)
+	if e == nil {
+		t.Errorf("was expecting NotRootErr but got nil")
+	}
+}
+
 func BenchmarkNodeGet(b *testing.B) {
 	goodCase := staticRoutes
 

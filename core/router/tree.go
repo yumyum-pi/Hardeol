@@ -1,6 +1,7 @@
 package router
 
 import (
+	"errors"
 	"net/http"
 )
 
@@ -33,19 +34,33 @@ func CreateRootNode() *node {
 	}
 }
 
-func (n *node) Add(url string, handle Handler) {
+var (
+	ErrDuplidateRoute = errors.New("duplicate path not allowed")
+	ErrNotRoot        = errors.New("not root")
+	// TODO:check of this error
+	ErrSegmentAfterWild = errors.New("segment after wild entry is not allowed")
+)
+
+// TODO:
+// check for node type
+// check priority for same level of children node
+// When error how to correct the entered part
+func (n *node) Add(url string, handle Handler) error {
 	current := n
 	if current.nodeType != nodeTypeRoot {
-		// TODO: Throw Error
+		return ErrNotRoot
 	}
 
+	// var for looping the findSegmentEnd
 	endIndex := 0
 	startIndex := 0
 	lenUrl := len(url)
 
 	path := ""
+
 	// loop over the paths
 	for endIndex < lenUrl {
+		// get the path segment by segment
 		endIndex = findSegmentEnd(url, startIndex)
 		path = url[startIndex:endIndex]
 		startIndex = endIndex
@@ -61,6 +76,14 @@ func (n *node) Add(url string, handle Handler) {
 			if c.path == path {
 				current = c
 				found = true
+				// check if the last path
+				if endIndex >= lenUrl {
+					if c.handler != nil {
+						return ErrDuplidateRoute
+					}
+					c.handler = handle
+				}
+
 				break
 			}
 		}
@@ -75,12 +98,18 @@ func (n *node) Add(url string, handle Handler) {
 				handler:  nil,
 			}
 
+			// check if the last path
+			if endIndex >= lenUrl {
+				c.handler = handle
+			}
+
 			// add to the current node
 			current.children = append(current.children, &c)
 			current = &c
-
 		}
 	}
+
+	return nil
 }
 
 func (n *node) Get(url string) (Handler, bool) {
