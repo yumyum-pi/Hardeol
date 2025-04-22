@@ -176,7 +176,7 @@ func (n *node) Get(url string) (h Handler, allMatch bool, params []Params, err e
 			switch c.nodeType {
 			case nodeTypeParams:
 				// store the value of param
-				params = append(params, extractParam(c, url, s, endIndex))
+				params = append(params, extractParamWithoutQuery(c, url, s, endIndex))
 				found = true
 				current = c
 				// checking if the last child
@@ -193,7 +193,7 @@ func (n *node) Get(url string) (h Handler, allMatch bool, params []Params, err e
 			case nodeTypeWild:
 				endIndex = lenUrl
 				// store the value of wild
-				params = append(params, extractParam(c, url, s, endIndex))
+				params = append(params, extractParamWithoutQuery(c, url, s, endIndex))
 				h = c.handler
 				if h == nil {
 					allMatch = false
@@ -278,13 +278,19 @@ func addToRow(n *node, parentLevel int) []printRow {
 	return rows
 }
 
-// TODO: query params should be in the last segment of the url. hence create different extractParam for middle and end segment
-func extractParam(c *node, url string, s int, endIndex int) Params {
+func extractParamWithoutQuery(n *node, url string, start int, end int) Params {
+	// find the position for query start
+	for i := start; i < end; i++ {
+		c := url[i]
+
+		if c == '?' {
+			end = i
+		}
+	}
 	// for key remove the "/:" from path
 	// for value the "/" from path
-	// TODO: remove query params from the param value
 	return Params{
-		Key:   c.path[2:],
-		Value: url[s+1 : endIndex],
+		Key:   n.path[2:],
+		Value: url[start+1 : end],
 	}
 }
