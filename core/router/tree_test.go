@@ -438,6 +438,9 @@ func TestNodePrint(t *testing.T) {
 		"/v1/base1/sub-base2",
 		"/v1/base1/sub-base3/:name",
 		"/v1/base2/sub-base3/*wild",
+		"/v1/base2/sub-base3/:name",
+		"/v1/base2/sub-base3/static2",
+		"/v1/base2/sub-base3/static",
 		"/v1/base2/sub-base4/based-4",
 	}
 
@@ -450,4 +453,45 @@ func TestNodePrint(t *testing.T) {
 	}
 
 	rootNode.print()
+}
+
+func TestNodeSortNodeType(t *testing.T) {
+	rootNode := CreateRootNode()
+
+	v := func(w http.ResponseWriter, r *http.Request) {
+	}
+
+	cases := []string{
+		"/v1/sub-base3/*wild",
+		"/v1/sub-base3/:name",
+		"/v1/sub-base3/static2",
+		"/v1/sub-base3/static",
+	}
+
+	// add the goodcase
+	for _, c := range cases {
+		err := rootNode.Add(c, v)
+		if err != nil {
+			t.Fatalf("unexpected err %v when adding url:%s", err, c)
+		}
+	}
+
+	list := []string{
+		"/static2",
+		"/static",
+		"/:name",
+		"/*wild",
+	}
+	c := rootNode.children[0].children[0]
+
+	// len check
+	if len(c.children) != len(list) {
+		t.Fatalf("unexpected len diff. c:%d  list:%d", len(c.children), len(list))
+	}
+
+	for i := range list {
+		if c.children[i].path != list[i] {
+			t.Fatalf("path name does not match at index:%d for c:%s. expecting: %s", i, c.children[i].path, list[i])
+		}
+	}
 }

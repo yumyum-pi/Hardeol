@@ -4,10 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 )
 
-type nodeType uint8
+type nodeType int
 
 const (
 	nodeTypeStatic nodeType = iota
@@ -51,11 +52,6 @@ type Params struct {
 	Value string
 }
 
-// TODO:
-// Check priority for same level of children node
-// - 1st Static
-// - 2nd Params
-// - 3rd Wild
 func (n *node) Add(url string, handle Handler) error {
 	current := n
 	if current.nodeType != nodeTypeRoot {
@@ -133,11 +129,16 @@ func (n *node) Add(url string, handle Handler) error {
 
 			// add to the current node
 			current.children = append(current.children, &c)
+			slices.SortFunc(current.children, nodeSort)
 			current = &c
 		}
 	}
 
 	return nil
+}
+
+func nodeSort(a, b *node) int {
+	return int(a.nodeType - b.nodeType)
 }
 
 func (n *node) Get(url string) (h Handler, allMatch bool, params []Params, err error) {
@@ -238,11 +239,11 @@ func (n *node) print() {
 	for _, r := range rows {
 
 		prefix := ""
-		if r.level == 1 {
+		if r.level == 0 {
 			prefix = "|-"
-		} else if r.level > 1 {
-			prefix = strings.Repeat("|  ", r.level-2)
-			prefix = fmt.Sprintf("%s|- ", prefix)
+		} else if r.level >= 1 {
+			prefix = strings.Repeat("| ", r.level-1)
+			prefix = fmt.Sprintf("%s|-", prefix)
 		}
 		path := fmt.Sprintf("%s%s", prefix, r.path)
 		fmt.Printf("%-20s | %d | %d | %v\n", path, r.level, r.nodeType, r.handler)
