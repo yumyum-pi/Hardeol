@@ -10,6 +10,7 @@ import (
 
 type nodeType int
 
+// TODO: throw error children have two (wild or param)
 const (
 	nodeTypeStatic nodeType = iota
 	nodeTypeParams
@@ -141,15 +142,14 @@ func nodeSort(a, b *node) int {
 	return int(a.nodeType - b.nodeType)
 }
 
-func (n *node) Get(url string) (h Handler, allMatch bool, params []Params, err error) {
+func (n *node) Get(url string) (h Handler, params []Params, err error) {
 	current := n
 	if current.nodeType != nodeTypeRoot {
-		return nil, false, nil, ErrNotRoot
+		return nil, nil, ErrNotRoot
 	}
 
 	params = make([]Params, 0)
 
-	allMatch = true
 	endIndex := 0
 	startIndex := 0
 	lenUrl := len(url)
@@ -184,7 +184,6 @@ func (n *node) Get(url string) (h Handler, allMatch bool, params []Params, err e
 					h = c.handler
 					// the last path should have a handler
 					if h == nil {
-						allMatch = false
 						err = ErrHandlerNotFound
 					}
 					return
@@ -196,7 +195,6 @@ func (n *node) Get(url string) (h Handler, allMatch bool, params []Params, err e
 				params = append(params, extractParamWithoutQuery(c, url, s, endIndex))
 				h = c.handler
 				if h == nil {
-					allMatch = false
 					err = ErrHandlerNotFound
 				}
 				return
@@ -211,7 +209,6 @@ func (n *node) Get(url string) (h Handler, allMatch bool, params []Params, err e
 						h = c.handler
 						// the last path should have a handler
 						if h == nil {
-							allMatch = false
 							err = ErrHandlerNotFound
 						}
 						return
@@ -222,7 +219,7 @@ func (n *node) Get(url string) (h Handler, allMatch bool, params []Params, err e
 		}
 
 		if !found {
-			allMatch = false
+			err = ErrPathNotFound
 			return
 		}
 	}
@@ -293,4 +290,54 @@ func extractParamWithoutQuery(n *node, url string, start int, end int) Params {
 		Key:   n.path[2:],
 		Value: url[start+1 : end],
 	}
+}
+
+var ErrPathNotFound = errors.New("path not found")
+
+func (n *node) remove(url string) (bool, error) {
+	// search the url
+	current := n
+	if current.nodeType != nodeTypeRoot {
+		return false, ErrNotRoot
+	}
+
+	endIndex := 0
+	startIndex := 0
+	lenUrl := len(url)
+
+	// loop over the paths
+	for endIndex < lenUrl {
+		endIndex = findSegmentEnd(url, startIndex)
+		path := url[startIndex:endIndex]
+		// change the startIndex for the next loop
+		startIndex = endIndex
+
+		// check if the current node has the path
+		if path == "" {
+			continue
+		}
+		found := false
+
+		for i, c := range current.children {
+			// handle the static node type
+			if c.path == path {
+				found = true
+				// checking if the last child
+				if endIndex >= lenUrl {
+					// DeleteNode
+					temp := slices.Delete(current.children, i, i+1)
+					current.children = slices.Clone(temp)
+
+					return true, nil
+				}
+
+				current = c
+			}
+		}
+
+		if !found {
+			return false, ErrPathNotFound
+		}
+	}
+	return false, ErrPathNotFound
 }

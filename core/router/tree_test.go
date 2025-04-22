@@ -194,14 +194,14 @@ func TestNode(t *testing.T) {
 
 	// check the good cases
 	for _, c := range goodCase {
-		if _, ok, _, _ := rootNode.Get(c); !ok {
-			t.Errorf("expecting to found: %s", c)
+		if _, _, err := rootNode.Get(c); err != nil {
+			t.Errorf("expecting to find: %s", c)
 		}
 	}
 
-	// check the good cases
+	// check the bad cases
 	for _, c := range badCase {
-		if _, ok, _, _ := rootNode.Get(c); ok {
+		if _, _, err := rootNode.Get(c); !errors.Is(err, ErrPathNotFound) {
 			t.Errorf("expecting not found: %s", c)
 		}
 	}
@@ -310,12 +310,9 @@ func TestNodeGetParam(t *testing.T) {
 		t.Fatalf("unexpected error adding route %q: %v", route, err)
 	}
 
-	h, match, params, err := rootNode.Get("/v1/vivek/rawat")
+	h, params, err := rootNode.Get("/v1/vivek/rawat")
 	if err != nil {
 		t.Fatalf("unexpected error on Get: %v", err)
-	}
-	if !match {
-		t.Fatalf("expected match to be true")
 	}
 	if params == nil {
 		t.Fatalf("expected params to be non-nil")
@@ -541,4 +538,153 @@ func TestExtractParamWithoutQuery(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNodeRemove(t *testing.T) {
+	rootNode := CreateRootNode()
+
+	v := func(w http.ResponseWriter, r *http.Request) {
+	}
+
+	paths := []string{
+		"/v1/base2/",
+		"/v1/base1/sub-base1",
+		"/v1/base1/sub-base2",
+		"/v1/base2/sub-base3/static",
+		"/v1/base2/sub-base3/static2",
+		"/v1/base2/sub-base3/*wild",
+		"/v1/base2/sub-base4/based-4",
+		"/v2/base1",
+		"/v3",
+	}
+
+	// add the cases
+	add := func() {
+		for _, p := range paths {
+			err := rootNode.Add(p, v)
+			if err != nil {
+				t.Fatalf("unexpected err %v when adding url:%s", err, p)
+			}
+		}
+	}
+
+	remove := func() {
+		toRemoveRoot := []string{
+			"/v1",
+			"/v2",
+			"/v3",
+		}
+
+		// remove path
+		for i, removePath := range toRemoveRoot {
+			_, err := rootNode.remove(removePath)
+			if err != nil {
+				t.Fatalf("unexpected err %v when remove url:%s index:%d", err, removePath, i)
+			}
+		}
+
+		// check if path is removed
+		for i, path := range paths {
+			_, _, err := rootNode.Get(path)
+			if !errors.Is(err, ErrPathNotFound) {
+				t.Fatalf("path should not exist %v when getting url:%s index:%d", err, path, i)
+			}
+		}
+	}
+
+	rest := func() {
+		remove()
+		add()
+	}
+
+	testCases := func(t *testing.T, testName string, rootNode *node, cases []struct {
+		url   string
+		found bool
+	},
+	) {
+		t.Run(testName, func(t *testing.T) {
+			for i, c := range cases {
+				_, _, err := rootNode.Get(c.url)
+				if !errors.Is(err, ErrPathNotFound) != c.found {
+					t.Fatalf("unexpected err %v when getting url:%s index:%d", err, c.url, i)
+				}
+			}
+		})
+	}
+
+	removePath := func(t *testing.T, rootNode *node, removePath string) {
+		_, err := rootNode.remove(removePath)
+		if err != nil {
+			t.Fatalf("unexpected err %v when remove url:%s", err, removePath)
+		}
+	}
+
+	add()
+
+	removeLastChildCases := []struct {
+		url   string
+		found bool
+	}{
+		{"/v1/base1/sub-base1", true},
+		{"/v1/base1/sub-base2", true},
+		{"/v1/base2/", true},
+		{"/v1/base2/sub-base3/wild1", false},
+		{"/v1/base2/sub-base3/static", true},
+		{"/v1/base2/sub-base3/static2", true},
+		{"/v1/base2/sub-base4/based-4", true},
+		{"/v2/base1", true},
+		{"/v3", true},
+	}
+
+	// remove last child
+	removePath(t, rootNode, "/v1/base2/sub-base3/*wild")
+	testCases(t, "remove last child", rootNode, removeLastChildCases)
+
+	rest()
+	removePath(t, rootNode, "/v1/base2")
+	removeParent := []struct {
+		url   string
+		found bool
+	}{
+		{"/v1/base1/sub-base1", true},
+		{"/v1/base1/sub-base2", true},
+		{"/v1/base2/", false},
+		{"/v1/base2/sub-base3/wild1", false},
+		{"/v1/base2/sub-base3/static", false},
+		{"/v1/base2/sub-base3/static2", false},
+		{"/v1/base2/sub-base4/based-4", false},
+		{"/v2/base1", true},
+		{"/v3", true},
+	}
+
+	testCases(t, "remove parent", rootNode, removeParent)
+
+	rest()
+	t.Run("remove unknown", func(t *testing.T) {
+		_, err := rootNode.remove("/v5")
+		if !errors.Is(err, ErrPathNotFound) {
+			t.Fatalf("expected err %v when removing url:%s err found:%v", ErrPathNotFound, "/v5", err)
+		}
+
+		unknownCases := []struct {
+			url   string
+			found bool
+		}{
+			{"/v1/base1/sub-base1", true},
+			{"/v1/base1/sub-base2", true},
+			{"/v1/base2/", true},
+			{"/v1/base2/sub-base3/wild1", true},
+			{"/v1/base2/sub-base3/static", true},
+			{"/v1/base2/sub-base3/static2", true},
+			{"/v1/base2/sub-base4/based-4", true},
+			{"/v2/base1", true},
+			{"/v3", true},
+		}
+		for i, c := range unknownCases {
+			_, _, err := rootNode.Get(c.url)
+			if !errors.Is(err, ErrPathNotFound) != c.found {
+				t.Fatalf("unexpected err %v when getting url:%s index:%d", err, c.url, i)
+			}
+		}
+	})
 }
