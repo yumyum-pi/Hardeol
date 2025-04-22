@@ -46,8 +46,16 @@ var (
 	ErrEmptyWild        = errors.New("empty wild not allowed")
 )
 
+type Params struct {
+	Key   string
+	Value string
+}
+
 // TODO:
 // Check priority for same level of children node
+// - 1st Static
+// - 2nd Params
+// - 3rd Wild
 func (n *node) Add(url string, handle Handler) error {
 	current := n
 	if current.nodeType != nodeTypeRoot {
@@ -132,13 +140,13 @@ func (n *node) Add(url string, handle Handler) error {
 	return nil
 }
 
-func (n *node) Get(url string) (h Handler, allMatch bool, params map[string]string, err error) {
+func (n *node) Get(url string) (h Handler, allMatch bool, params []Params, err error) {
 	current := n
 	if current.nodeType != nodeTypeRoot {
 		return nil, false, nil, ErrNotRoot
 	}
 
-	params = make(map[string]string)
+	params = make([]Params, 0)
 
 	allMatch = true
 	endIndex := 0
@@ -167,7 +175,7 @@ func (n *node) Get(url string) (h Handler, allMatch bool, params map[string]stri
 			switch c.nodeType {
 			case nodeTypeParams:
 				// store the value of param
-				extractParam(params, c, url, s, endIndex)
+				params = append(params, extractParam(c, url, s, endIndex))
 				found = true
 				current = c
 				// checking if the last child
@@ -184,8 +192,7 @@ func (n *node) Get(url string) (h Handler, allMatch bool, params map[string]stri
 			case nodeTypeWild:
 				endIndex = lenUrl
 				// store the value of wild
-				extractParam(params, c, url, s, endIndex)
-				params[c.path] = url[s:endIndex]
+				params = append(params, extractParam(c, url, s, endIndex))
 				h = c.handler
 				if h == nil {
 					allMatch = false
@@ -221,7 +228,6 @@ func (n *node) Get(url string) (h Handler, allMatch bool, params map[string]stri
 	return
 }
 
-// TODO: create print function
 func (n *node) print() {
 	if n.nodeType != nodeTypeRoot {
 		return
@@ -271,9 +277,13 @@ func addToRow(n *node, parentLevel int) []printRow {
 	return rows
 }
 
-func extractParam(params map[string]string, c *node, url string, s int, endIndex int) {
+// TODO: query params should be in the last segment of the url. hence create different extractParam for middle and end segment
+func extractParam(c *node, url string, s int, endIndex int) Params {
 	// for key remove the "/:" from path
 	// for value the "/" from path
 	// TODO: remove query params from the param value
-	params[c.path[2:]] = url[s+1 : endIndex]
+	return Params{
+		Key:   c.path[2:],
+		Value: url[s+1 : endIndex],
+	}
 }

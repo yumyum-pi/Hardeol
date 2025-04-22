@@ -3,6 +3,7 @@ package router
 import (
 	"errors"
 	"net/http"
+	"reflect"
 	"testing"
 )
 
@@ -322,10 +323,16 @@ func TestNodeGetParam(t *testing.T) {
 	if len(params) != 2 {
 		t.Fatalf("expected 2 params, got %d", len(params))
 	}
-	if got := params["param1"]; got != "vivek" {
+	if got := params[0]; reflect.DeepEqual(got, Params{
+		Key:   "Param1",
+		Value: "vivek",
+	}) {
 		t.Errorf("expected param1 to be 'vivek', got %q", got)
 	}
-	if got := params["param2"]; got != "rawat" {
+	if got := params[1]; reflect.DeepEqual(got, Params{
+		Key:   "Param2",
+		Value: "rawat",
+	}) {
 		t.Errorf("expected param2 to be 'rawat', got %q", got)
 	}
 	if h == nil {
