@@ -15,16 +15,15 @@ const (
 // if no further '/' is found, it returns len(url).
 func findSegmentEnd(path string, start int) int {
 	l := len(path)
-	if start >= l {
+	if start >= l || start < 0 {
 		return l
 	}
 
-	i := start + 1
-	for i < l {
+	// starting for start + 1, to avoid "/" at the begining for the segment
+	for i := start + 1; i < l; i++ {
 		if path[i] == '/' {
 			return i
 		}
-		i++
 	}
 
 	return l

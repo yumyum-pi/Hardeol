@@ -449,7 +449,9 @@ func TestNodePrint(t *testing.T) {
 		}
 	}
 
-	rootNode.print()
+	if testing.Verbose() {
+		rootNode.print()
+	}
 }
 
 func TestNodeSortNodeType(t *testing.T) {

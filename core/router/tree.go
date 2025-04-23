@@ -78,77 +78,81 @@ func (n *node) Add(url string, handle Handler) error {
 			continue
 		}
 
-		found := false
+		var child *node
 		// check if path exist in children
 		for _, c := range current.children {
 			if c.path == path {
-				current = c
-				found = true
-				// check if the last path
-				if endIndex >= lenUrl {
-					if c.handler != nil {
-						return ErrDuplicateRoute
-					}
-					c.handler = handle
-				}
-
+				child = c
 				break
 			}
 		}
 
-		if !found {
-			// path does not exist in the children
-			// append a new children with path
-
-			nType := nodeTypeStatic
-			if len(path) > 1 {
-				char := path[1]
-				switch char {
-				case '*':
-					nType = nodeTypeWild
-					if len(path) < 3 {
-						return ErrEmptyWild
-					}
-				case ':':
-					nType = nodeTypeParams
-					if len(path) < 3 {
-						return ErrEmptyParam
-					}
-				}
+		if child == nil {
+			nType, err := segmentType(path)
+			if err != nil {
+				return err
 			}
-			c := node{
+
+			child = &node{
 				path:     path,
 				children: make([]*node, 0),
 				nodeType: nType,
 				handler:  nil,
 			}
 
-			// check if the last path
-			if endIndex >= lenUrl {
-				c.handler = handle
-			}
-
 			// add to the current node
-			current.children = append(current.children, &c)
+			current.children = append(current.children, child)
 			slices.SortFunc(current.children, nodeSort)
-			current = &c
+		}
+
+		current = child
+
+		// check if the last path
+		if endIndex >= lenUrl {
+			if current.handler != nil {
+				return ErrDuplicateRoute
+			}
+			current.handler = handle
 		}
 	}
 
 	return nil
 }
 
+func segmentType(seg string) (nodeType, error) {
+	const minBuffer = 3
+	l := len(seg)
+	if l > 1 {
+		char := seg[1]
+		switch char {
+		case '*':
+			if l < minBuffer {
+				return nodeTypeWild, ErrEmptyWild
+			}
+			return nodeTypeWild, nil
+		case ':':
+			if l < minBuffer {
+				return nodeTypeParams, ErrEmptyParam
+			}
+
+			return nodeTypeParams, nil
+		}
+	}
+
+	return nodeTypeStatic, nil
+}
+
 func nodeSort(a, b *node) int {
 	return int(a.nodeType - b.nodeType)
 }
 
-func (n *node) Get(url string) (h Handler, params []Params, err error) {
+func (n *node) Get(url string) (Handler, []Params, error) {
 	current := n
 	if current.nodeType != nodeTypeRoot {
 		return nil, nil, ErrNotRoot
 	}
 
-	params = make([]Params, 0)
+	params := make([]Params, 0)
 
 	endIndex := 0
 	startIndex := 0
@@ -168,62 +172,42 @@ func (n *node) Get(url string) (h Handler, params []Params, err error) {
 		if path == "" {
 			continue
 		}
-		found := false
+		var match *node
 
-	matchLoop:
-		for _, c := range current.children {
+	matchBreak:
+		for _, child := range current.children {
 			// switch based on nodetype
-			switch c.nodeType {
+			switch child.nodeType {
 			case nodeTypeParams:
 				// store the value of param
-				params = append(params, extractParamWithoutQuery(c, url, s, endIndex))
-				found = true
-				current = c
-				// checking if the last child
-				if endIndex >= lenUrl {
-					h = c.handler
-					// the last path should have a handler
-					if h == nil {
-						err = ErrHandlerNotFound
-					}
-					return
-				}
-				break matchLoop
+				params = append(params, extractParamWithoutQuery(child, url, s, endIndex))
+				match = child
+				break matchBreak
 			case nodeTypeWild:
 				endIndex = lenUrl
 				// store the value of wild
-				params = append(params, extractParamWithoutQuery(c, url, s, endIndex))
-				h = c.handler
-				if h == nil {
-					err = ErrHandlerNotFound
-				}
-				return
-
+				params = append(params, extractParamWithoutQuery(child, url, s, endIndex))
+				match = child
+				break matchBreak
 			default:
 				// handle the static node type
-				if c.path == path {
-					found = true
-					current = c
-					// checking if the last child
-					if endIndex >= lenUrl {
-						h = c.handler
-						// the last path should have a handler
-						if h == nil {
-							err = ErrHandlerNotFound
-						}
-						return
-					}
-					break matchLoop
+				if child.path == path {
+					match = child
+					break matchBreak
 				}
 			}
 		}
 
-		if !found {
-			err = ErrPathNotFound
-			return
+		if match == nil {
+			return nil, nil, ErrPathNotFound
 		}
+		current = match
 	}
-	return
+
+	if current.handler == nil {
+		return nil, nil, ErrHandlerNotFound
+	}
+	return current.handler, params, nil
 }
 
 func (n *node) print() {
@@ -295,7 +279,6 @@ func extractParamWithoutQuery(n *node, url string, start int, end int) Params {
 var ErrPathNotFound = errors.New("path not found")
 
 func (n *node) remove(url string) (bool, error) {
-	// search the url
 	current := n
 	if current.nodeType != nodeTypeRoot {
 		return false, ErrNotRoot
@@ -318,9 +301,9 @@ func (n *node) remove(url string) (bool, error) {
 		}
 		found := false
 
-		for i, c := range current.children {
+		for i, child := range current.children {
 			// handle the static node type
-			if c.path == path {
+			if child.path == path {
 				found = true
 				// checking if the last child
 				if endIndex >= lenUrl {
@@ -331,7 +314,7 @@ func (n *node) remove(url string) (bool, error) {
 					return true, nil
 				}
 
-				current = c
+				current = child
 			}
 		}
 
