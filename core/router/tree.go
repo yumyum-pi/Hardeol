@@ -18,7 +18,7 @@ const (
 	nodeTypeRoot
 )
 
-type Handler func(http.ResponseWriter, *http.Request)
+type Handle func(http.ResponseWriter, *http.Request, []Params)
 
 // node represents part of the URL path in the trie.
 type node struct {
@@ -26,7 +26,7 @@ type node struct {
 	path     string
 	children []*node
 	nodeType nodeType
-	handler  Handler
+	handler  Handle
 }
 
 // CreateRootNode initializes and returns an empty root node.
@@ -53,7 +53,7 @@ type Params struct {
 	Value string
 }
 
-func (n *node) Add(url string, handle Handler) error {
+func (n *node) Add(url string, handle Handle) error {
 	current := n
 	if current.nodeType != nodeTypeRoot {
 		return ErrNotRoot
@@ -146,7 +146,7 @@ func nodeSort(a, b *node) int {
 	return int(a.nodeType - b.nodeType)
 }
 
-func (n *node) Get(url string) (Handler, []Params, error) {
+func (n *node) Get(url string) (Handle, []Params, error) {
 	current := n
 	if current.nodeType != nodeTypeRoot {
 		return nil, nil, ErrNotRoot
