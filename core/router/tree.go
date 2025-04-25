@@ -1,7 +1,6 @@
 package router
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"slices"
@@ -36,21 +35,6 @@ func CreateRootNode() *node {
 		children: make([]*node, 0),
 		nodeType: nodeTypeRoot,
 	}
-}
-
-var (
-	ErrDuplicateRoute = errors.New("duplicate path not allowed")
-	ErrNotRoot        = errors.New("not root")
-	// TODO:check of this error
-	ErrSegmentAfterWild = errors.New("segment after wild entry is not allowed")
-	ErrHandlerNotFound  = errors.New("handler not found")
-	ErrEmptyParam       = errors.New("empty param not allowed")
-	ErrEmptyWild        = errors.New("empty wild not allowed")
-)
-
-type Params struct {
-	Key   string
-	Value string
 }
 
 func (n *node) Add(url string, handle Handle) error {
@@ -258,25 +242,6 @@ func addToRow(n *node, parentLevel int) []printRow {
 	}
 	return rows
 }
-
-func extractParamWithoutQuery(n *node, url string, start int, end int) Params {
-	// find the position for query start
-	for i := start; i < end; i++ {
-		c := url[i]
-
-		if c == '?' {
-			end = i
-		}
-	}
-	// for key remove the "/:" from path
-	// for value the "/" from path
-	return Params{
-		Key:   n.path[2:],
-		Value: url[start+1 : end],
-	}
-}
-
-var ErrPathNotFound = errors.New("path not found")
 
 func (n *node) remove(url string) (bool, error) {
 	current := n
