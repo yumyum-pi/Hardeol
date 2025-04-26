@@ -12,7 +12,7 @@ type testRoute struct {
 	path   string
 }
 
-var staticRoutes = []string{
+var staticPath = []string{
 	"/",
 	"/cmd.html",
 	"/code.html",
@@ -178,7 +178,7 @@ func TestNode(t *testing.T) {
 	v := func(w http.ResponseWriter, r *http.Request, p []Params) {
 	}
 
-	goodCase := staticRoutes
+	goodCase := staticPath
 	badCase := []string{
 		"/v5",
 		"/v1/base5",
@@ -396,7 +396,7 @@ func TestNodeType(t *testing.T) {
 }
 
 func BenchmarkNodeGet(b *testing.B) {
-	goodCase := staticRoutes
+	goodCase := staticPath
 
 	badCase := []string{
 		"/v5",
@@ -532,7 +532,7 @@ func TestNodeRemove(t *testing.T) {
 
 		// remove path
 		for i, removePath := range toRemoveRoot {
-			_, err := rootNode.remove(removePath)
+			err := rootNode.remove(removePath)
 			if err != nil {
 				t.Fatalf("unexpected err %v when remove url:%s index:%d", err, removePath, i)
 			}
@@ -568,7 +568,7 @@ func TestNodeRemove(t *testing.T) {
 	}
 
 	removePath := func(t *testing.T, rootNode *node, removePath string) {
-		_, err := rootNode.remove(removePath)
+		err := rootNode.remove(removePath)
 		if err != nil {
 			t.Fatalf("unexpected err %v when remove url:%s", err, removePath)
 		}
@@ -616,7 +616,7 @@ func TestNodeRemove(t *testing.T) {
 
 	rest()
 	t.Run("remove unknown", func(t *testing.T) {
-		_, err := rootNode.remove("/v5")
+		err := rootNode.remove("/v5")
 		if !errors.Is(err, ErrPathNotFound) {
 			t.Fatalf("expected err %v when removing url:%s err found:%v", ErrPathNotFound, "/v5", err)
 		}

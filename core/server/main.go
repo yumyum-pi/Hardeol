@@ -19,11 +19,11 @@ func New(addr string, routes *router.DynamicRouter) *Server {
 }
 
 func (s *Server) Serve() error {
-	s.router.Handle("/hardeol", hardeolHandler)
+	s.router.Handle(router.MethodGET, "/hardeol", hardeolHandler)
 	return http.ListenAndServe(s.addr, s.router)
 }
 
-func hardeolHandler(w http.ResponseWriter, r *http.Request) {
+func hardeolHandler(w http.ResponseWriter, r *http.Request, p []router.Params) {
 	_, err := w.Write([]byte("Welcome to the hardeol!"))
 	if err != nil {
 		// TODO: do something

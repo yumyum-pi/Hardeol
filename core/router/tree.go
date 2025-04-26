@@ -5,8 +5,10 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"sync"
 )
 
+// TODO: check for cuncurrency stafty
 type nodeType int
 
 // TODO: throw error children have two (wild or param)
@@ -22,6 +24,7 @@ type Handle func(http.ResponseWriter, *http.Request, []Params)
 // node represents part of the URL path in the trie.
 type node struct {
 	// path the represents the node
+	mu       sync.RWMutex
 	path     string
 	children []*node
 	nodeType nodeType
@@ -38,6 +41,8 @@ func CreateRootNode() *node {
 }
 
 func (n *node) Add(url string, handle Handle) error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
 	current := n
 	if current.nodeType != nodeTypeRoot {
 		return ErrNotRoot
@@ -131,6 +136,8 @@ func nodeSort(a, b *node) int {
 }
 
 func (n *node) Get(url string) (Handle, []Params, error) {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
 	current := n
 	if current.nodeType != nodeTypeRoot {
 		return nil, nil, ErrNotRoot
@@ -243,10 +250,12 @@ func addToRow(n *node, parentLevel int) []printRow {
 	return rows
 }
 
-func (n *node) remove(url string) (bool, error) {
+func (n *node) remove(url string) error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
 	current := n
 	if current.nodeType != nodeTypeRoot {
-		return false, ErrNotRoot
+		return ErrNotRoot
 	}
 
 	endIndex := 0
@@ -276,7 +285,7 @@ func (n *node) remove(url string) (bool, error) {
 					temp := slices.Delete(current.children, i, i+1)
 					current.children = slices.Clone(temp)
 
-					return true, nil
+					return nil
 				}
 
 				current = child
@@ -284,8 +293,8 @@ func (n *node) remove(url string) (bool, error) {
 		}
 
 		if !found {
-			return false, ErrPathNotFound
+			return ErrPathNotFound
 		}
 	}
-	return false, ErrPathNotFound
+	return ErrPathNotFound
 }
