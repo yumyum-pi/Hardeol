@@ -34,7 +34,7 @@ func BenchmarkStaticRoutes(b *testing.B) {
 	u := r.URL
 	rq := u.RawQuery
 
-	h := func(w http.ResponseWriter, r *http.Request, p []Param) {
+	h := func(ctx *Ctx) {
 	}
 
 	for _, r := range staticRoutes {

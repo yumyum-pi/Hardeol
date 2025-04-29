@@ -3,7 +3,6 @@ package router
 import (
 	"fmt"
 	"math/rand"
-	"net/http"
 	"sync"
 	"testing"
 	"time"
@@ -43,7 +42,7 @@ func TestDynamicRouterConcurrency(t *testing.T) {
 }
 
 func dummyHandler(u string) Handle {
-	return func(w http.ResponseWriter, r *http.Request, p []Param) {
-		w.Write([]byte("ok:" + u))
+	return func(ctx *Ctx) {
+		ctx.Response.Write([]byte("ok:" + u))
 	}
 }

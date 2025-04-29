@@ -23,8 +23,8 @@ func TestServer_AddRouteWhileServing(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Dynamically add a new route "/test" to the running server.
-	r.Handle(router.MethodGET, "/test", func(w http.ResponseWriter, r *http.Request, p []router.Param) {
-		w.Write([]byte("Test route response"))
+	r.Handle(router.MethodGET, "/test", func(ctx *router.Ctx) {
+		ctx.Response.Write([]byte("Test route response"))
 	})
 
 	// Allow time for the route registration.

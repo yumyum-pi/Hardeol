@@ -23,8 +23,8 @@ func (s *Server) Serve() error {
 	return http.ListenAndServe(s.addr, s.router)
 }
 
-func hardeolHandler(w http.ResponseWriter, r *http.Request, p []router.Param) {
-	_, err := w.Write([]byte("Welcome to the hardeol!"))
+func hardeolHandler(ctx *router.Ctx) {
+	_, err := ctx.Response.Write([]byte("Welcome to the hardeol!"))
 	if err != nil {
 		// TODO: do something
 		fmt.Println("hello")

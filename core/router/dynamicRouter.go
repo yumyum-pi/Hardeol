@@ -49,8 +49,9 @@ func (d *DynamicRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	m := HTTPMethodToIndex(r.Method)
 
+	ctx := CreateCtx(w, r, nil)
 	if m < 0 {
-		d.methodNotAllowed(w, r, nil)
+		d.methodNotAllowed(ctx)
 		return
 	}
 
@@ -60,15 +61,16 @@ func (d *DynamicRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		switch err {
 		case ErrNotRoot:
-			d.notRootHandler(w, r, nil)
+			d.notRootHandler(ctx)
 		case ErrPathNotFound:
-			d.pathNotFoundHandler(w, r, nil)
+			d.pathNotFoundHandler(ctx)
 		case ErrHandlerNotFound:
-			d.handlerNotFoundHandler(w, r, nil)
+			d.handlerNotFoundHandler(ctx)
 		}
 		return
 	}
-	h(w, r, p)
+	ctx.params = p
+	h(ctx)
 }
 
 func (d *DynamicRouter) Remove(method int, path string) error {

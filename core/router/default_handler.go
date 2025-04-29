@@ -6,30 +6,30 @@ import (
 	"yumyum-pi/Hardeol/core/logger"
 )
 
-func defaultPathNotFoundHandler(w http.ResponseWriter, r *http.Request, p []Param) {
-	url := r.URL.Path
-	w.WriteHeader(http.StatusBadRequest)
-	fmt.Fprintf(w, "path not found:%s\n", url)
+func defaultPathNotFoundHandler(ctx *Ctx) {
+	url := ctx.Request.URL.Path
+	ctx.Response.WriteHeader(http.StatusBadRequest)
+	fmt.Fprintf(ctx.Response, "path not found:%s\n", url)
 	logger.Error.Printf("handler not found:%s", url)
 }
 
-func defaultHandlerNotFoundHandler(w http.ResponseWriter, r *http.Request, p []Param) {
-	url := r.URL.Path
-	w.WriteHeader(http.StatusInternalServerError)
+func defaultHandlerNotFoundHandler(ctx *Ctx) {
+	url := ctx.Request.URL.Path
+	ctx.Response.WriteHeader(http.StatusInternalServerError)
 	logger.Error.Printf("handler not found:%s", url)
-	fmt.Fprintf(w, "handler not found:%s\n", url)
+	fmt.Fprintf(ctx.Response, "handler not found:%s\n", url)
 }
 
-func defaultNotRootHandler(w http.ResponseWriter, r *http.Request, p []Param) {
-	url := r.URL.Path
-	w.WriteHeader(http.StatusInternalServerError)
+func defaultNotRootHandler(ctx *Ctx) {
+	url := ctx.Request.URL.Path
+	ctx.Response.WriteHeader(http.StatusInternalServerError)
 	logger.Error.Printf("non root nodes are not allowed to assess get func: %s\n", url)
-	fmt.Fprintf(w, "internal server error, path:%s\n", url)
+	fmt.Fprintf(ctx.Response, "internal server error, path:%s\n", url)
 }
 
-func defaultMethodNotAllowed(w http.ResponseWriter, r *http.Request, p []Param) {
-	url := r.URL.Path
-	w.WriteHeader(http.StatusBadRequest)
+func defaultMethodNotAllowed(ctx *Ctx) {
+	url := ctx.Request.URL.Path
+	ctx.Response.WriteHeader(http.StatusBadRequest)
 	logger.Error.Println("Method not allowed")
-	fmt.Fprintf(w, "internal server error, path:%s\n", url)
+	fmt.Fprintf(ctx.Response, "internal server error, path:%s\n", url)
 }

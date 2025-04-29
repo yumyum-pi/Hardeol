@@ -2,7 +2,6 @@ package router
 
 import (
 	"fmt"
-	"net/http"
 	"slices"
 	"strings"
 	"sync"
@@ -19,7 +18,7 @@ const (
 	nodeTypeRoot
 )
 
-type Handle func(http.ResponseWriter, *http.Request, []Param)
+type Handle func(*Ctx)
 
 // node represents part of the URL path in the trie.
 type node struct {

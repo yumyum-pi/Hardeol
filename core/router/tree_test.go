@@ -2,7 +2,6 @@ package router
 
 import (
 	"errors"
-	"net/http"
 	"reflect"
 	"testing"
 )
@@ -175,8 +174,7 @@ var staticPath = []string{
 func TestNode(t *testing.T) {
 	rootNode := CreateRootNode()
 
-	v := func(w http.ResponseWriter, r *http.Request, p []Param) {
-	}
+	v := func(ctx *Ctx) {}
 
 	goodCase := staticPath
 	badCase := []string{
@@ -210,7 +208,7 @@ func TestNode(t *testing.T) {
 func TestNodeErrDuplicateRoute(t *testing.T) {
 	rootNode := CreateRootNode()
 
-	v := func(w http.ResponseWriter, r *http.Request, p []Param) {}
+	v := func(ctx *Ctx) {}
 
 	tests := []struct {
 		name        string
@@ -242,7 +240,7 @@ func TestNodeErrDuplicateRoute(t *testing.T) {
 func TestNodeErrNotRoot(t *testing.T) {
 	rootNode := CreateRootNode()
 
-	v := func(w http.ResponseWriter, r *http.Request, p []Param) {}
+	v := func(ctx *Ctx) {}
 
 	validRoutes := []string{
 		"/v1/base/2",
@@ -269,7 +267,7 @@ func TestNodeErrNotRoot(t *testing.T) {
 func TestNodeErrEmptyParam(t *testing.T) {
 	rootNode := CreateRootNode()
 
-	v := func(w http.ResponseWriter, r *http.Request, p []Param) {}
+	v := func(ctx *Ctx) {}
 
 	badRoute := "/v1/:/2"
 	goodRoute := "/v1/:a/2"
@@ -286,7 +284,7 @@ func TestNodeErrEmptyParam(t *testing.T) {
 func TestNodeErrEmptyWild(t *testing.T) {
 	rootNode := CreateRootNode()
 
-	v := func(w http.ResponseWriter, r *http.Request, p []Param) {}
+	v := func(ctx *Ctx) {}
 
 	badRoute := "/v1/*/2"
 	goodRoute := "/v1/*a/2"
@@ -303,7 +301,7 @@ func TestNodeErrEmptyWild(t *testing.T) {
 func TestNodeGetParam(t *testing.T) {
 	rootNode := CreateRootNode()
 
-	v := func(w http.ResponseWriter, r *http.Request, p []Param) {}
+	v := func(ctx *Ctx) {}
 	route := "/v1/:param1/:param2"
 
 	if err := rootNode.Add(route, v); err != nil {
@@ -340,7 +338,7 @@ func TestNodeGetParam(t *testing.T) {
 func TestNodeType(t *testing.T) {
 	rootNode := CreateRootNode()
 
-	v := func(w http.ResponseWriter, r *http.Request, p []Param) {}
+	v := func(ctx *Ctx) {}
 
 	tests := []struct {
 		name         string
@@ -408,7 +406,7 @@ func BenchmarkNodeGet(b *testing.B) {
 
 	allCase := append(goodCase, badCase...)
 
-	v := func(w http.ResponseWriter, r *http.Request, p []Param) {}
+	v := func(ctx *Ctx) {}
 	rootNode := CreateRootNode()
 	for _, c := range goodCase {
 		rootNode.Add(c, v)
@@ -424,8 +422,7 @@ func BenchmarkNodeGet(b *testing.B) {
 func TestNodePrint(t *testing.T) {
 	rootNode := CreateRootNode()
 
-	v := func(w http.ResponseWriter, r *http.Request, p []Param) {
-	}
+	v := func(ctx *Ctx) {}
 
 	cases := []string{
 		"/v3",
@@ -457,8 +454,7 @@ func TestNodePrint(t *testing.T) {
 func TestNodeSortNodeType(t *testing.T) {
 	rootNode := CreateRootNode()
 
-	v := func(w http.ResponseWriter, r *http.Request, p []Param) {
-	}
+	v := func(ctx *Ctx) {}
 
 	cases := []string{
 		"/v1/sub-base3/*wild",
@@ -498,8 +494,7 @@ func TestNodeSortNodeType(t *testing.T) {
 func TestNodeRemove(t *testing.T) {
 	rootNode := CreateRootNode()
 
-	v := func(w http.ResponseWriter, r *http.Request, p []Param) {
-	}
+	v := func(ctx *Ctx) {}
 
 	paths := []string{
 		"/v1/base2/",
