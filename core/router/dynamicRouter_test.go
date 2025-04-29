@@ -43,7 +43,7 @@ func TestDynamicRouterConcurrency(t *testing.T) {
 }
 
 func dummyHandler(u string) Handle {
-	return func(w http.ResponseWriter, r *http.Request, p []Params) {
+	return func(w http.ResponseWriter, r *http.Request, p []Param) {
 		w.Write([]byte("ok:" + u))
 	}
 }

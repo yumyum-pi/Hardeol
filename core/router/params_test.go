@@ -9,7 +9,7 @@ func TestExtractParamWithoutQuery(t *testing.T) {
 		url      string
 		start    int
 		end      int
-		expected Params
+		expected Param
 	}{
 		{
 			name:     "simple param extraction",
@@ -17,7 +17,7 @@ func TestExtractParamWithoutQuery(t *testing.T) {
 			url:      "/john",
 			start:    0,
 			end:      5,
-			expected: Params{Key: "username", Value: "john"},
+			expected: Param{Key: "username", Value: "john"},
 		},
 		{
 			name:     "param with query string",
@@ -25,7 +25,7 @@ func TestExtractParamWithoutQuery(t *testing.T) {
 			url:      "/12345?sort=asc",
 			start:    0,
 			end:      len("/12345?sort=asc"),
-			expected: Params{Key: "id", Value: "12345"},
+			expected: Param{Key: "id", Value: "12345"},
 		},
 		{
 			name:     "param without leading slash",
@@ -33,7 +33,7 @@ func TestExtractParamWithoutQuery(t *testing.T) {
 			url:      "/golang",
 			start:    0,
 			end:      7,
-			expected: Params{Key: "project", Value: "golang"},
+			expected: Param{Key: "project", Value: "golang"},
 		},
 	}
 

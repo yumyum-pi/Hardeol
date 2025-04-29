@@ -19,7 +19,7 @@ const (
 	nodeTypeRoot
 )
 
-type Handle func(http.ResponseWriter, *http.Request, []Params)
+type Handle func(http.ResponseWriter, *http.Request, []Param)
 
 // node represents part of the URL path in the trie.
 type node struct {
@@ -135,7 +135,7 @@ func nodeSort(a, b *node) int {
 	return int(a.nodeType - b.nodeType)
 }
 
-func (n *node) Get(url string) (Handle, []Params, error) {
+func (n *node) Get(url string) (Handle, []Param, error) {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	current := n
@@ -143,7 +143,7 @@ func (n *node) Get(url string) (Handle, []Params, error) {
 		return nil, nil, ErrNotRoot
 	}
 
-	params := make([]Params, 0)
+	params := make([]Param, 0)
 
 	endIndex := 0
 	startIndex := 0
