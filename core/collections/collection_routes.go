@@ -10,18 +10,15 @@ import (
 )
 
 // TODO: Add an auth middleware only the admin should be able to view
-func collectionsHandlerFunc(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodGet:
-		collectionsHandleList(w, r)
-	case http.MethodPost:
-		collectionsHandleCreate(w, r)
-	default:
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+func collectionsHandlerFunc() []crudRouterReturnType {
+	return []crudRouterReturnType{
+		{router.MethodGET, "/collection", collectionsHandleList},
+		{router.MethodPOST, "/collection", collectionsHandleCreate},
 	}
 }
 
-func collectionsHandleList(w http.ResponseWriter, r *http.Request) {
+func collectionsHandleList(ctx *router.Ctx) {
+	w := ctx.Response
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 
@@ -42,7 +39,9 @@ func collectionsHandleList(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func collectionsHandleCreate(w http.ResponseWriter, r *http.Request) {
+func collectionsHandleCreate(ctx *router.Ctx) {
+	w := ctx.Response
+	r := ctx.Request
 	col := new(Collection)
 
 	if err := json.NewDecoder(r.Body).Decode(col); err != nil {

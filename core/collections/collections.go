@@ -25,7 +25,16 @@ func Init(r *router.DynamicRouter) {
 	if res.Error != nil {
 		logger.Error.Println(res.Error.Error())
 	}
-	r.Handle("/collection/", collectionsHandlerFunc)
+
+	handlers := collectionsHandlerFunc()
+
+	for _, h := range handlers {
+		r.Handle(
+			h.method,
+			h.path,
+			h.handler,
+		)
+	}
 	CollectionNameInit()
 
 	// loop over all the collections
@@ -49,20 +58,21 @@ func newCollection(cc Collection, db *gorm.DB, r *router.DynamicRouter) {
 		logger.Error.Println(err)
 	}
 
-	h := CRUDRouter(&cc)
+	handlers := CRUDRouter(&cc)
 	// TODO: why does this stops the processing when not making a gorotine
-	for i := range h {
-		go r.Handle(
-			fmt.Sprintf("%s /%s/%s", h[i].method, cc.Name, h[i].path),
-			h[i].handler,
+	for _, h := range handlers {
+		r.Handle(
+			h.method,
+			h.path,
+			h.handler,
 		)
 	}
 }
 
 type crudRouterReturnType struct {
-	method  string
+	method  int
 	path    string
-	handler http.HandlerFunc
+	handler router.Handle
 }
 
 func CRUDRouter(c *Collection) []crudRouterReturnType {
@@ -72,7 +82,7 @@ func CRUDRouter(c *Collection) []crudRouterReturnType {
 	// TODO: add the following
 	// - Add filter
 	// - Add pagenation
-	handleList := func(w http.ResponseWriter, r *http.Request) {
+	handleList := func(ctx *router.Ctx) {
 		// create slice at runtime
 		sliceType := reflect.SliceOf(t)
 		sliceValue := reflect.MakeSlice(sliceType, 0, 0)
@@ -82,16 +92,18 @@ func CRUDRouter(c *Collection) []crudRouterReturnType {
 		res := db.Table(c.Name).Find(&valSlice)
 		if res.Error != nil {
 			// TODO: proper error check
-			ResponseError(w, http.StatusInternalServerError, res.Error.Error())
+			ResponseError(ctx.Response, http.StatusInternalServerError, res.Error.Error())
 			return
 		}
-		ResponseOk(w, http.StatusOK, valSlice)
+		ResponseOk(ctx.Response, http.StatusOK, valSlice)
 	}
 
 	// handle create to collection
 	// TODO: add the following
 	// - validation
-	handleCreate := func(w http.ResponseWriter, r *http.Request) {
+	handleCreate := func(ctx *router.Ctx) {
+		r := ctx.Request
+		w := ctx.Response
 		v := reflect.New(t).Interface()
 		err := json.NewDecoder(r.Body).Decode(v)
 		if err != nil {
@@ -113,7 +125,9 @@ func CRUDRouter(c *Collection) []crudRouterReturnType {
 	}
 
 	// handle delete to collection
-	handleDelete := func(w http.ResponseWriter, r *http.Request) {
+	handleDelete := func(ctx *router.Ctx) {
+		r := ctx.Request
+		w := ctx.Response
 		// get ID from URL
 
 		id := r.URL.Query().Get("id")
@@ -141,18 +155,18 @@ func CRUDRouter(c *Collection) []crudRouterReturnType {
 	asdf := make([]crudRouterReturnType, 0)
 
 	asdf = append(asdf, crudRouterReturnType{
-		http.MethodGet,
-		"",
+		router.MethodGET,
+		"/",
 		handleList,
 	})
 
 	asdf = append(asdf, crudRouterReturnType{
-		http.MethodPost,
+		router.MethodPOST,
 		"",
 		handleCreate,
 	})
 	asdf = append(asdf, crudRouterReturnType{
-		http.MethodDelete,
+		router.MethodDELETE,
 		"{id}",
 		handleDelete,
 	})

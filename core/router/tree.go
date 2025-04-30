@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"yumyum-pi/Hardeol/core/logger"
 )
 
 // TODO: check for cuncurrency stafty
@@ -104,6 +105,7 @@ func (n *node) Add(url string, handle Handle) error {
 		}
 	}
 
+	logger.Info.Println("New route added:", path)
 	return nil
 }
 
