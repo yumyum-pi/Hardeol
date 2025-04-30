@@ -105,7 +105,7 @@ func (n *node) Add(url string, handle Handle) error {
 		}
 	}
 
-	logger.Info.Println("New route added:", path)
+	logger.Info.Println("New route added:", url)
 	return nil
 }
 

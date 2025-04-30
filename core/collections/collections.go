@@ -14,6 +14,8 @@ import (
 
 var c []Collection
 
+const CollectionString = "collection"
+
 func Init(r *router.DynamicRouter) {
 	// make the db call
 	database.Migrate(&SchemaField{})
@@ -126,11 +128,10 @@ func CRUDRouter(c *Collection) []crudRouterReturnType {
 
 	// handle delete to collection
 	handleDelete := func(ctx *router.Ctx) {
-		r := ctx.Request
 		w := ctx.Response
 		// get ID from URL
 
-		id := r.URL.Query().Get("id")
+		id := ctx.GetParam("id")
 		if id == "" {
 			ResponseError(w, http.StatusBadRequest, "id not found")
 			return
@@ -156,18 +157,18 @@ func CRUDRouter(c *Collection) []crudRouterReturnType {
 
 	asdf = append(asdf, crudRouterReturnType{
 		router.MethodGET,
-		"/",
+		fmt.Sprintf("/%s/%s", CollectionString, c.Name),
 		handleList,
 	})
 
 	asdf = append(asdf, crudRouterReturnType{
 		router.MethodPOST,
-		"",
+		fmt.Sprintf("/%s/%s", CollectionString, c.Name),
 		handleCreate,
 	})
 	asdf = append(asdf, crudRouterReturnType{
 		router.MethodDELETE,
-		"{id}",
+		fmt.Sprintf("/%s/%s/:id", CollectionString, c.Name),
 		handleDelete,
 	})
 
