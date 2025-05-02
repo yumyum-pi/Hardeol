@@ -82,7 +82,7 @@ func ToCamelCase2(input string) string {
 	s := make([]byte, 0, l)
 	underscore := false
 	j := 0
-	for i := 0; i < l; i++ {
+	for i := range l {
 		ic := input[i]
 		if ic == '_' {
 			underscore = true
