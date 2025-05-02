@@ -4,9 +4,19 @@ Minimal backend API builder for small projects.
 
 TODO:
 
-- [ ] create user
-- [ ] create collection
-- [ ] create web server
-- [ ] create CRUD end points
+- Collection
+
+  - [x] Create collection
+  - [x] Create web server
+  - [x] Create CRUD end points
+
+- Authentication:
+
+  - [ ] Create User
+  - [ ] Verify User Token
+
+- Authorization:
+  - [ ] Permission
+  - [ ] Create Role & Map to permission
 
 Hardeol is one of the major peaks of the Kumaon Himalaya.
