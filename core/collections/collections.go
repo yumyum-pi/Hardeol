@@ -94,10 +94,10 @@ func CRUDRouter(c *Collection) []crudRouterReturnType {
 		res := db.Table(c.Name).Find(&valSlice)
 		if res.Error != nil {
 			// TODO: proper error check
-			ResponseError(ctx.Response, http.StatusInternalServerError, res.Error.Error())
+			ctx.ResponseError(http.StatusInternalServerError, res.Error.Error())
 			return
 		}
-		ResponseOk(ctx.Response, http.StatusOK, valSlice)
+		ctx.ResponseOk(http.StatusOK, valSlice)
 	}
 
 	// handle create to collection
@@ -105,12 +105,11 @@ func CRUDRouter(c *Collection) []crudRouterReturnType {
 	// - validation
 	handleCreate := func(ctx *router.Ctx) {
 		r := ctx.Request
-		w := ctx.Response
 		v := reflect.New(t).Interface()
 		err := json.NewDecoder(r.Body).Decode(v)
 		if err != nil {
 			// TODO: proper error check
-			ResponseError(w, http.StatusBadRequest, fmt.Sprintf("Invalid JSON Input:%s", err.Error()))
+			ctx.ResponseError(http.StatusBadRequest, fmt.Sprintf("Invalid JSON Input:%s", err.Error()))
 			return
 		}
 
@@ -119,38 +118,37 @@ func CRUDRouter(c *Collection) []crudRouterReturnType {
 
 		if res.Error != nil {
 			// TODO: proper error check
-			ResponseError(w, http.StatusInternalServerError, res.Error.Error())
+			ctx.ResponseError(http.StatusInternalServerError, res.Error.Error())
 			return
 		}
 
-		ResponseOk(w, http.StatusOK, v)
+		ctx.ResponseOk(http.StatusOK, v)
 	}
 
 	// handle delete to collection
 	handleDelete := func(ctx *router.Ctx) {
-		w := ctx.Response
 		// get ID from URL
 
 		id := ctx.GetParam("id")
 		if id == "" {
-			ResponseError(w, http.StatusBadRequest, "id not found")
+			ctx.ResponseError(http.StatusBadRequest, "id not found")
 			return
 		}
 		db := database.Get()
 		res := db.Table(c.Name).Where("id = ?", id).Delete(nil)
 		if res.Error != nil {
 			// TODO: proper error check
-			ResponseError(w, http.StatusInternalServerError, res.Error.Error())
+			ctx.ResponseError(http.StatusInternalServerError, res.Error.Error())
 			return
 		}
 
 		if res.RowsAffected == 0 {
 			// TODO: proper error check
-			ResponseError(w, http.StatusBadRequest, "Record not found")
+			ctx.ResponseError(http.StatusBadRequest, "Record not found")
 			return
 		}
 
-		ResponseOk(w, http.StatusOK, id)
+		ctx.ResponseOk(http.StatusOK, id)
 	}
 
 	asdf := make([]crudRouterReturnType, 0)

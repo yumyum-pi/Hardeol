@@ -52,7 +52,7 @@ func collectionsHandleCreate(ctx *router.Ctx) {
 	// run validation
 	// collection name should be unique
 	if CollectionNameExists(col.Name) {
-		ResponseError(w, http.StatusBadRequest, "collection Name is not unique")
+		ctx.ResponseError(http.StatusBadRequest, "collection Name is not unique")
 		return
 	}
 
@@ -77,5 +77,5 @@ func collectionsHandleCreate(ctx *router.Ctx) {
 
 	rb := router.Get()
 	newCollection(*col, db, rb)
-	ResponseOk(w, http.StatusOK, col)
+	ctx.ResponseOk(http.StatusOK, col)
 }
