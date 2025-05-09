@@ -24,7 +24,7 @@ func Get() *gorm.DB {
 	return db
 }
 
-func Migrate(dst ...interface{}) {
+func Migrate(dst ...any) {
 	err := db.AutoMigrate(dst...)
 	if err != nil {
 		panic("failed to migrate")
