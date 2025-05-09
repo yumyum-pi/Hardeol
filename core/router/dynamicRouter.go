@@ -103,3 +103,12 @@ func Init() {
 		methodNotAllowed:       defaultMethodNotAllowed,
 	}
 }
+
+func (r *DynamicRouter) HandleGroup(grp *RouteGroup) error {
+	for _, rt := range grp.routes {
+		if err := r.Handle(rt.method, rt.path, rt.handle); err != nil {
+			return err
+		}
+	}
+	return nil
+}
