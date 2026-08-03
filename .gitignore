@@ -28,4 +28,14 @@ go.work.sum
 # env file
 .env
 
-./UI/node_modules/*
+# Built binary
+hardeol_server
+
+# Claude Code
+.claude/
+
+# UI dependencies and build
+UI/node_modules/
+UI/dist/
+ui/node_modules/
+ui/dist/
