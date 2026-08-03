@@ -359,8 +359,12 @@ body {
 }
 
 .actions-col {
-  width: 100px;
+  width: 140px;
   text-align: right;
+}
+
+.actions-col .btn + .btn {
+  margin-left: 0.5rem;
 }
 
 /* Forms */

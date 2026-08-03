@@ -15,6 +15,8 @@ export function CollectionView(props: CollectionViewProps) {
   const [showAddForm, setShowAddForm] = createSignal(false);
   const [newRecord, setNewRecord] = createSignal<Record<string, string>>({});
   const [collection, setCollection] = createSignal<Collection | null>(null);
+  const [editingRecord, setEditingRecord] = createSignal<Record<string, unknown> | null>(null);
+  const [editFormData, setEditFormData] = createSignal<Record<string, string>>({});
 
   const fetchRecords = async () => {
     setLoading(true);
@@ -67,6 +69,42 @@ export function CollectionView(props: CollectionViewProps) {
     if (response.error) {
       setError(response.error);
     } else {
+      await fetchRecords();
+    }
+  };
+
+  const openEditForm = (record: Record<string, unknown>) => {
+    setEditingRecord(record);
+    // Convert all values to strings for the form
+    const formData: Record<string, string> = {};
+    for (const [key, value] of Object.entries(record)) {
+      if (key !== 'id') {
+        formData[key] = String(value ?? '');
+      }
+    }
+    setEditFormData(formData);
+  };
+
+  const handleEditRecord = async (e: Event) => {
+    e.preventDefault();
+    const record = editingRecord();
+    if (!record) return;
+
+    const data: Record<string, unknown> = {};
+
+    // Convert string values to appropriate types
+    for (const [key, value] of Object.entries(editFormData())) {
+      // Try to parse as number
+      const num = Number(value);
+      data[key] = isNaN(num) ? value : num;
+    }
+
+    const response = await api.updateRecord(props.name, record.id as number, data);
+    if (response.error) {
+      setError(response.error);
+    } else {
+      setEditingRecord(null);
+      setEditFormData({});
       await fetchRecords();
     }
   };
@@ -133,6 +171,38 @@ export function CollectionView(props: CollectionViewProps) {
         </div>
       </Show>
 
+      <Show when={editingRecord()}>
+        <div class="modal-overlay" onClick={() => setEditingRecord(null)}>
+          <div class="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Edit Record (ID: {editingRecord()?.id as number})</h3>
+            <form onSubmit={handleEditRecord}>
+              <For each={columns().filter(c => c !== 'id')}>
+                {(column) => (
+                  <div class="form-group">
+                    <label>{column}</label>
+                    <input
+                      type="text"
+                      value={editFormData()[column] || ''}
+                      onInput={(e) =>
+                        setEditFormData({ ...editFormData(), [column]: e.currentTarget.value })
+                      }
+                    />
+                  </div>
+                )}
+              </For>
+              <div class="form-actions">
+                <button type="button" class="btn" onClick={() => setEditingRecord(null)}>
+                  Cancel
+                </button>
+                <button type="submit" class="btn btn-primary">
+                  Save
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </Show>
+
       <Show when={loading()}>
         <div class="loading">Loading...</div>
       </Show>
@@ -165,6 +235,12 @@ export function CollectionView(props: CollectionViewProps) {
                       {(column) => <td>{String(record[column] ?? '')}</td>}
                     </For>
                     <td class="actions-col">
+                      <button
+                        class="btn btn-sm"
+                        onClick={() => openEditForm(record)}
+                      >
+                        Edit
+                      </button>
                       <button
                         class="btn btn-danger btn-sm"
                         onClick={() => handleDelete(record.id as number)}

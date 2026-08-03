@@ -77,6 +77,12 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
+  updateRecord: (collectionName: string, id: number | string, data: Record<string, unknown>) =>
+    request<Record<string, unknown>>(`/collection/${collectionName}/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
   deleteRecord: (collectionName: string, id: number | string) =>
     request<string>(`/collection/${collectionName}/${id}`, {
       method: 'DELETE',
