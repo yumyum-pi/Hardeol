@@ -89,6 +89,25 @@ func newCollectionRoutes(cc Collection, db *gorm.DB, r *router.DynamicRouter) er
 	return nil
 }
 
+// UpdateCollectionRoutes removes old routes and registers new ones with updated schema
+func UpdateCollectionRoutes(cc Collection, db *gorm.DB, r *router.DynamicRouter) error {
+	basePath := fmt.Sprintf("/%s/%s", CollectionString, cc.Name)
+
+	// Remove old routes
+	r.Remove(router.MethodGET, basePath)
+	r.Remove(router.MethodPOST, basePath)
+	r.Remove(router.MethodDELETE, basePath+"/:id")
+
+	// Re-register with updated schema
+	handlers := CRUDRouter(&cc)
+	for _, h := range handlers {
+		if err := r.Handle(h.method, h.path, h.handler); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 type crudRouterReturnType struct {
 	method  int
 	path    string

@@ -1,9 +1,10 @@
 import { createSignal, onMount, For, Show } from 'solid-js';
-import { api } from '../api/client';
+import { api, Collection } from '../api/client';
 
 interface CollectionViewProps {
   name: string;
   onBack: () => void;
+  onEditSchema?: (collection: Collection) => void;
 }
 
 export function CollectionView(props: CollectionViewProps) {
@@ -13,6 +14,7 @@ export function CollectionView(props: CollectionViewProps) {
   const [error, setError] = createSignal<string | null>(null);
   const [showAddForm, setShowAddForm] = createSignal(false);
   const [newRecord, setNewRecord] = createSignal<Record<string, string>>({});
+  const [collection, setCollection] = createSignal<Collection | null>(null);
 
   const fetchRecords = async () => {
     setLoading(true);
@@ -23,15 +25,14 @@ export function CollectionView(props: CollectionViewProps) {
     } else {
       const data = response.data || [];
       setRecords(data);
-      if (data.length > 0) {
+      // Fetch collection schema to get columns and store collection for editing
+      const colResponse = await api.listCollections();
+      const col = colResponse.data?.find(c => c.name === props.name);
+      if (col) {
+        setCollection(col);
+        setColumns(col.fields.map(f => f.name));
+      } else if (data.length > 0) {
         setColumns(Object.keys(data[0]));
-      } else {
-        // Fetch collection schema to get columns
-        const colResponse = await api.listCollections();
-        const collection = colResponse.data?.find(c => c.name === props.name);
-        if (collection) {
-          setColumns(collection.fields.map(f => f.name));
-        }
       }
     }
     setLoading(false);
@@ -81,9 +82,19 @@ export function CollectionView(props: CollectionViewProps) {
           </button>
           <h2>{props.name}</h2>
         </div>
-        <button class="btn btn-primary" onClick={() => setShowAddForm(true)}>
-          + Add Record
-        </button>
+        <div class="header-actions">
+          <Show when={props.onEditSchema && collection()}>
+            <button
+              class="btn"
+              onClick={() => props.onEditSchema?.(collection()!)}
+            >
+              Edit Schema
+            </button>
+          </Show>
+          <button class="btn btn-primary" onClick={() => setShowAddForm(true)}>
+            + Add Record
+          </button>
+        </div>
       </header>
 
       <Show when={error()}>

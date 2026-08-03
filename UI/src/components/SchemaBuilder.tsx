@@ -1,6 +1,6 @@
 import { createSignal, For, Show } from 'solid-js';
 import { createStore, produce } from 'solid-js/store';
-import { api } from '../api/client';
+import { api, Collection } from '../api/client';
 
 interface Field {
   name: string;
@@ -11,21 +11,46 @@ interface Field {
 interface SchemaBuilderProps {
   onSave: () => void;
   onCancel: () => void;
+  collection?: Collection; // If provided, we're in edit mode
 }
 
 export function SchemaBuilder(props: SchemaBuilderProps) {
-  const [name, setName] = createSignal('');
-  const [fields, setFields] = createStore<Field[]>([
-    { name: '', type: 'TEXT', required: false },
-  ]);
+  const isEditMode = () => !!props.collection;
+
+  // Initialize from collection if in edit mode
+  const initialFields = (): Field[] => {
+    if (props.collection) {
+      // Filter out the id field - it's auto-managed
+      return props.collection.fields
+        .filter((f) => f.name !== 'id')
+        .map((f) => ({
+          name: f.name,
+          type: f.type,
+          required: f.required,
+        }));
+    }
+    return [{ name: '', type: 'TEXT', required: false }];
+  };
+
+  const [name, setName] = createSignal(props.collection?.name || '');
+  const [fields, setFields] = createStore<Field[]>(initialFields());
   const [error, setError] = createSignal<string | null>(null);
   const [saving, setSaving] = createSignal(false);
+  const [showRemovalWarning, setShowRemovalWarning] = createSignal(false);
 
   const addField = () => {
     setFields(produce((f) => f.push({ name: '', type: 'TEXT', required: false })));
   };
 
   const removeField = (index: number) => {
+    // In edit mode, show warning about data loss if removing an existing field
+    if (isEditMode() && props.collection) {
+      const fieldName = fields[index].name;
+      const existingField = props.collection.fields.find((f) => f.name === fieldName);
+      if (existingField) {
+        setShowRemovalWarning(true);
+      }
+    }
     setFields(produce((f) => f.splice(index, 1)));
   };
 
@@ -51,14 +76,23 @@ export function SchemaBuilder(props: SchemaBuilderProps) {
 
     setSaving(true);
 
-    const response = await api.createCollection({
-      name: name().trim(),
-      fields: validFields.map((f) => ({
-        name: f.name.trim(),
-        type: f.type,
-        required: f.required,
-      })),
-    });
+    const fieldData = validFields.map((f) => ({
+      name: f.name.trim(),
+      type: f.type,
+      required: f.required,
+    }));
+
+    let response;
+    if (isEditMode()) {
+      response = await api.updateCollection(name().trim(), {
+        fields: fieldData,
+      });
+    } else {
+      response = await api.createCollection({
+        name: name().trim(),
+        fields: fieldData,
+      });
+    }
 
     setSaving(false);
 
@@ -76,12 +110,19 @@ export function SchemaBuilder(props: SchemaBuilderProps) {
           <button class="btn btn-text" onClick={props.onCancel}>
             &larr; Cancel
           </button>
-          <h2>New Collection</h2>
+          <h2>{isEditMode() ? `Edit Collection: ${props.collection?.name}` : 'New Collection'}</h2>
         </div>
       </header>
 
       <Show when={error()}>
         <div class="error-banner">{error()}</div>
+      </Show>
+
+      <Show when={showRemovalWarning()}>
+        <div class="warning-banner">
+          Warning: Removing fields will permanently delete the data in those columns.
+          <button class="btn btn-sm" onClick={() => setShowRemovalWarning(false)}>Dismiss</button>
+        </div>
       </Show>
 
       <form onSubmit={handleSubmit} class="schema-form">
@@ -96,9 +137,12 @@ export function SchemaBuilder(props: SchemaBuilderProps) {
               onInput={(e) => setName(e.currentTarget.value)}
               pattern="^[a-zA-Z][a-zA-Z0-9_]*$"
               title="Must start with letter, alphanumeric and underscore only"
+              disabled={isEditMode()}
             />
             <span class="form-hint">
-              Must start with a letter. Only letters, numbers, and underscores.
+              {isEditMode()
+                ? 'Collection name cannot be changed.'
+                : 'Must start with a letter. Only letters, numbers, and underscores.'}
             </span>
           </div>
         </div>
@@ -173,7 +217,13 @@ export function SchemaBuilder(props: SchemaBuilderProps) {
             Cancel
           </button>
           <button type="submit" class="btn btn-primary" disabled={saving()}>
-            {saving() ? 'Creating...' : 'Create Collection'}
+            {saving()
+              ? isEditMode()
+                ? 'Saving...'
+                : 'Creating...'
+              : isEditMode()
+                ? 'Save Changes'
+                : 'Create Collection'}
           </button>
         </div>
       </form>

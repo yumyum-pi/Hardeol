@@ -37,5 +37,3 @@ hardeol_server
 # UI dependencies and build
 UI/node_modules/
 UI/dist/
-ui/node_modules/
-ui/dist/

@@ -8,7 +8,8 @@ export type View =
   | { type: 'collections' }
   | { type: 'collection'; name: string }
   | { type: 'schema'; collection?: Collection }
-  | { type: 'new-collection' };
+  | { type: 'new-collection' }
+  | { type: 'edit-collection'; collection: Collection };
 
 export interface SchemaField {
   id?: number;
@@ -59,11 +60,23 @@ function App() {
           <CollectionView
             name={(currentView() as { type: 'collection'; name: string }).name}
             onBack={() => setCurrentView({ type: 'collections' })}
+            onEditSchema={(collection) => setCurrentView({ type: 'edit-collection', collection })}
           />
         </Show>
 
         <Show when={currentView().type === 'new-collection'}>
           <SchemaBuilder
+            onSave={async () => {
+              await refreshCollections();
+              setCurrentView({ type: 'collections' });
+            }}
+            onCancel={() => setCurrentView({ type: 'collections' })}
+          />
+        </Show>
+
+        <Show when={currentView().type === 'edit-collection'}>
+          <SchemaBuilder
+            collection={(currentView() as { type: 'edit-collection'; collection: Collection }).collection}
             onSave={async () => {
               await refreshCollections();
               setCurrentView({ type: 'collections' });

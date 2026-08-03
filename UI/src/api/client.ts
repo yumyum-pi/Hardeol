@@ -25,6 +25,10 @@ export interface CreateCollectionRequest {
   fields: Omit<SchemaField, 'id' | 'collection_id'>[];
 }
 
+export interface UpdateCollectionRequest {
+  fields: Omit<SchemaField, 'id' | 'collection_id'>[];
+}
+
 async function request<T>(
   endpoint: string,
   options?: RequestInit
@@ -54,6 +58,12 @@ export const api = {
   createCollection: (data: CreateCollectionRequest) =>
     request<Collection>('/collection', {
       method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateCollection: (name: string, data: UpdateCollectionRequest) =>
+    request<Collection>(`/collection/${name}`, {
+      method: 'PUT',
       body: JSON.stringify(data),
     }),
 

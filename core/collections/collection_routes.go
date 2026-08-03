@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"yumyum-pi/Hardeol/core/database"
 	"yumyum-pi/Hardeol/core/router"
+
+	"gorm.io/gorm"
 )
 
 // TODO: Add an auth middleware only the admin should be able to view
@@ -12,6 +14,7 @@ func collectionsHandlerFunc() []crudRouterReturnType {
 	return []crudRouterReturnType{
 		{router.MethodGET, "/collection", collectionsHandleList},
 		{router.MethodPOST, "/collection", collectionsHandleCreate},
+		{router.MethodPUT, "/collection/:name", collectionsHandleUpdate},
 	}
 }
 
@@ -83,4 +86,102 @@ func collectionsHandleCreate(ctx *router.Ctx) {
 	}
 
 	ctx.ResponseOk(http.StatusCreated, col)
+}
+
+// UpdateCollectionRequest represents the request body for updating a collection
+type UpdateCollectionRequest struct {
+	Fields []SchemaField `json:"fields"`
+}
+
+func collectionsHandleUpdate(ctx *router.Ctx) {
+	// Get collection name from URL params
+	name := ctx.GetParam("name")
+	if name == "" {
+		ctx.ResponseError(http.StatusBadRequest, "collection name is required")
+		return
+	}
+
+	// Parse request body
+	var req UpdateCollectionRequest
+	if err := json.NewDecoder(ctx.Request.Body).Decode(&req); err != nil {
+		ctx.ResponseError(http.StatusBadRequest, "Invalid JSON input: "+err.Error())
+		return
+	}
+
+	db := database.Get()
+
+	// Fetch existing collection with fields
+	var col Collection
+	res := db.Preload("Fields").Where("name = ?", name).First(&col)
+	if res.Error != nil {
+		ctx.ResponseError(http.StatusNotFound, "collection not found")
+		return
+	}
+
+	// Ensure ID field is preserved - check if new fields have id, if not add it
+	hasID := false
+	for i := range req.Fields {
+		if req.Fields[i].Name == "id" {
+			hasID = true
+			break
+		}
+	}
+	if !hasID {
+		id := DefaultIDSchemeField()
+		req.Fields = append(req.Fields, id)
+	}
+
+	// Compute schema diff
+	diff := ComputeSchemaDiff(col.Fields, req.Fields)
+
+	// If no changes, return early
+	if diff.IsEmpty() {
+		ctx.ResponseOk(http.StatusOK, col)
+		return
+	}
+
+	// Execute migration in transaction
+	err := db.Transaction(func(tx *gorm.DB) error {
+		// Migrate the underlying data table
+		if err := MigrateCollectionSchema(tx, col.Name, col.Fields, req.Fields, diff); err != nil {
+			return err
+		}
+
+		// Delete old schema fields
+		if err := tx.Where("collection_id = ?", col.ID).Delete(&SchemaField{}).Error; err != nil {
+			return err
+		}
+
+		// Insert new schema fields
+		for i := range req.Fields {
+			req.Fields[i].CollectionID = col.ID
+			req.Fields[i].ID = 0 // Reset ID to let DB auto-generate
+		}
+		if err := tx.Create(&req.Fields).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		ctx.ResponseError(http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// Reload collection with updated fields
+	res = db.Preload("Fields").First(&col, col.ID)
+	if res.Error != nil {
+		ctx.ResponseError(http.StatusInternalServerError, res.Error.Error())
+		return
+	}
+
+	// Re-register routes with updated schema
+	rb := router.Get()
+	if err := UpdateCollectionRoutes(col, db, rb); err != nil {
+		ctx.ResponseError(http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	ctx.ResponseOk(http.StatusOK, col)
 }
