@@ -16,7 +16,7 @@ func InitSqlite() {
 		TranslateError: true,
 	})
 	if err != nil {
-		panic("failed to connect database")
+		panic("failed to connect database: " + err.Error())
 	}
 }
 
@@ -27,6 +27,6 @@ func Get() *gorm.DB {
 func Migrate(dst ...any) {
 	err := db.AutoMigrate(dst...)
 	if err != nil {
-		panic("failed to migrate")
+		panic("failed to migrate: " + err.Error())
 	}
 }

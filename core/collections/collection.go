@@ -2,12 +2,19 @@ package collections
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"reflect"
 	"yumyum-pi/Hardeol/utils"
 
 	"gorm.io/gorm"
+)
+
+var (
+	ErrNoValidFields   = errors.New("collection has no valid fields")
+	ErrUnknownType     = errors.New("unknown field type")
+	ErrEmptyCollection = errors.New("collection must have at least one field")
 )
 
 type Collection struct {
@@ -32,13 +39,22 @@ func (c *Collection) AddField(f SchemaField) {
 }
 
 func (c *Collection) CreateType() reflect.Type {
-	f := make([]reflect.StructField, 0)
-	// TODO: add  validation
+	t, _ := c.CreateTypeWithValidation()
+	return t
+}
+
+// CreateTypeWithValidation creates a reflect.Type from collection fields with validation
+func (c *Collection) CreateTypeWithValidation() (reflect.Type, error) {
+	if len(c.Fields) == 0 {
+		return nil, ErrEmptyCollection
+	}
+
+	f := make([]reflect.StructField, 0, len(c.Fields))
 	for i := range c.Fields {
-		t := c.Fields[i].Type
+		fieldType := c.Fields[i].Type
 		n := utils.CapFirstChar(c.Fields[i].Name)
 
-		switch t {
+		switch fieldType {
 		case "TEXT":
 			f = append(f, reflect.StructField{
 				Name: n,
@@ -51,11 +67,17 @@ func (c *Collection) CreateType() reflect.Type {
 				Type: reflect.TypeOf(0),
 				Tag:  reflect.StructTag(fmt.Sprintf(`json:"%s"`, utils.ToSnakeUnsafe(n))),
 			})
+		default:
+			return nil, fmt.Errorf("%w: %s", ErrUnknownType, fieldType)
 		}
-
 	}
+
+	if len(f) == 0 {
+		return nil, ErrNoValidFields
+	}
+
 	t := reflect.StructOf(f)
-	return t
+	return t, nil
 }
 
 func (c *Collection) Create(body io.Reader) (any, error) {
@@ -71,9 +93,12 @@ func (c *Collection) Create(body io.Reader) (any, error) {
 }
 
 func (c *Collection) DBInit(db *gorm.DB) error {
-	t := c.CreateType()
+	t, err := c.CreateTypeWithValidation()
+	if err != nil {
+		return err
+	}
 	v := reflect.New(t).Interface()
-	err := db.Table(c.Name).AutoMigrate(v)
+	err = db.Table(c.Name).AutoMigrate(v)
 	if err != nil {
 		return err
 	}

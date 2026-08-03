@@ -41,14 +41,14 @@ func (c *Ctx) JSON(status int, data any) {
 }
 
 func (c *Ctx) ResponseOk(status int, data any) {
-	wrapper := make(map[string]any, 0)
+	wrapper := make(map[string]any, 2)
 	wrapper["status"] = status
 	wrapper["data"] = data
 	c.JSON(status, wrapper)
 }
 
 func (c *Ctx) ResponseError(status int, err any) {
-	wrapper := make(map[string]any, 0)
+	wrapper := make(map[string]any, 2)
 	wrapper["status"] = status
 	wrapper["error"] = err
 	c.JSON(status, wrapper)

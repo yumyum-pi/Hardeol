@@ -8,9 +8,9 @@ import (
 
 func defaultPathNotFoundHandler(ctx *Ctx) {
 	url := ctx.Request.URL.Path
-	ctx.Response.WriteHeader(http.StatusBadRequest)
+	ctx.Response.WriteHeader(http.StatusNotFound)
 	fmt.Fprintf(ctx.Response, "path not found:%s\n", url)
-	logger.Error.Printf("handler not found:%s", url)
+	logger.Error.Printf("path not found:%s", url)
 }
 
 func defaultHandlerNotFoundHandler(ctx *Ctx) {
@@ -29,7 +29,8 @@ func defaultNotRootHandler(ctx *Ctx) {
 
 func defaultMethodNotAllowed(ctx *Ctx) {
 	url := ctx.Request.URL.Path
-	ctx.Response.WriteHeader(http.StatusBadRequest)
-	logger.Error.Println("Method not allowed")
-	fmt.Fprintf(ctx.Response, "internal server error, path:%s\n", url)
+	method := ctx.Request.Method
+	ctx.Response.WriteHeader(http.StatusMethodNotAllowed)
+	logger.Error.Printf("method not allowed: %s %s", method, url)
+	fmt.Fprintf(ctx.Response, "method not allowed: %s %s\n", method, url)
 }

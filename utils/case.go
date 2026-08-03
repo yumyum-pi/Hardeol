@@ -1,9 +1,6 @@
 package utils
 
-import (
-	"strings"
-	"unsafe"
-)
+import "strings"
 
 func ToSnake(camel string) string {
 	if camel == "" {
@@ -54,8 +51,8 @@ func ToSnakeUnsafe(camel string) string {
 
 		buf = append(buf, byte(r))
 	}
-	// Use unsafe conversion to avoid copying the byte slice
-	return *(*string)(unsafe.Pointer(&buf))
+	// Safe conversion
+	return string(buf)
 }
 
 func ToCamelCase(input string) string {
@@ -81,7 +78,6 @@ func ToCamelCase2(input string) string {
 	l := len(input)
 	s := make([]byte, 0, l)
 	underscore := false
-	j := 0
 	for i := range l {
 		ic := input[i]
 		if ic == '_' {
@@ -90,13 +86,11 @@ func ToCamelCase2(input string) string {
 		}
 
 		if underscore {
-			s[j] = ic - diff
+			s = append(s, ic-diff)
 			underscore = false
 		} else {
-			s[j] = ic
+			s = append(s, ic)
 		}
-		j += 1
-
 	}
 	return string(s)
 }

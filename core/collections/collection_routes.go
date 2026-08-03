@@ -2,10 +2,8 @@ package collections
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"yumyum-pi/Hardeol/core/database"
-	"yumyum-pi/Hardeol/core/logger"
 	"yumyum-pi/Hardeol/core/router"
 )
 
@@ -18,53 +16,50 @@ func collectionsHandlerFunc() []crudRouterReturnType {
 }
 
 func collectionsHandleList(ctx *router.Ctx) {
-	w := ctx.Response
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-
 	list := make([]Collection, 0)
 
 	db := database.Get()
 	res := db.Preload("Fields").Find(&list)
 	if res.Error != nil {
-		fmt.Println("erorr", res.Error.Error())
+		ctx.ResponseError(http.StatusInternalServerError, res.Error.Error())
+		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	err := json.NewEncoder(w).Encode(list)
-	if err != nil {
-		logger.Error.Print(err.Error())
-		fmt.Println("err:", err.Error())
-	}
+	ctx.ResponseOk(http.StatusOK, list)
 }
 
 func collectionsHandleCreate(ctx *router.Ctx) {
-	w := ctx.Response
 	r := ctx.Request
 	col := new(Collection)
 
 	if err := json.NewDecoder(r.Body).Decode(col); err != nil {
-		http.Error(w, "Invalid JSON input", http.StatusBadRequest)
+		ctx.ResponseError(http.StatusBadRequest, "Invalid JSON input: "+err.Error())
 		return
 	}
 
-	// run validation
-	// collection name should be unique
-	if CollectionNameExists(col.Name) {
-		ctx.ResponseError(http.StatusBadRequest, "collection Name is not unique")
+	// validate collection name format
+	if !IsValidCollectionName(col.Name) {
+		ctx.ResponseError(http.StatusBadRequest, "Invalid collection name: must start with letter, contain only alphanumeric and underscore, max 64 chars")
 		return
 	}
 
-	// check if the collection has id
-	foundID := false
+	// atomically check if name exists and reserve it (prevents TOCTOU race)
+	if !CollectionNameAddIfNotExists(col.Name) {
+		ctx.ResponseError(http.StatusBadRequest, "collection name is not unique")
+		return
+	}
+
+	// check if the collection has id field
+	hasID := false
 	for i := range col.Fields {
-		if col.Fields[i].Name != "id" {
-			foundID = true
+		if col.Fields[i].Name == "id" {
+			hasID = true
+			break
 		}
 	}
 
-	if foundID {
+	// only add default ID field if not already present
+	if !hasID {
 		id := DefaultIDSchemeField()
 		col.Fields = append(col.Fields, id)
 	}
@@ -72,10 +67,20 @@ func collectionsHandleCreate(ctx *router.Ctx) {
 	db := database.Get()
 	res := db.Create(col)
 	if res.Error != nil {
-		fmt.Println(res.Error.Error())
+		// rollback the name reservation on failure
+		CollectionNameDelete(col.Name)
+		ctx.ResponseError(http.StatusInternalServerError, res.Error.Error())
+		return
 	}
 
 	rb := router.Get()
-	newCollection(*col, db, rb)
-	ctx.ResponseOk(http.StatusOK, col)
+	err := newCollectionRoutes(*col, db, rb)
+	if err != nil {
+		// rollback on failure
+		CollectionNameDelete(col.Name)
+		ctx.ResponseError(http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	ctx.ResponseOk(http.StatusCreated, col)
 }

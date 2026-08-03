@@ -49,19 +49,19 @@ func Init(r *router.DynamicRouter) {
 }
 
 func newCollection(cc Collection, db *gorm.DB, r *router.DynamicRouter) {
-	if CollectionNameExists(cc.Name) {
+	if !CollectionNameAddIfNotExists(cc.Name) {
 		logger.Error.Println("duplicate name: ", cc.Name)
 		return
 	}
 
-	CollectionNameAdd(cc.Name)
 	err := cc.DBInit(db)
 	if err != nil {
 		logger.Error.Println(err)
+		CollectionNameDelete(cc.Name)
+		return
 	}
 
 	handlers := CRUDRouter(&cc)
-	// TODO: why does this stops the processing when not making a gorotine
 	for _, h := range handlers {
 		r.Handle(
 			h.method,
@@ -69,6 +69,24 @@ func newCollection(cc Collection, db *gorm.DB, r *router.DynamicRouter) {
 			h.handler,
 		)
 	}
+}
+
+// newCollectionRoutes creates routes for a collection (used after DB insert)
+func newCollectionRoutes(cc Collection, db *gorm.DB, r *router.DynamicRouter) error {
+	err := cc.DBInit(db)
+	if err != nil {
+		return err
+	}
+
+	handlers := CRUDRouter(&cc)
+	for _, h := range handlers {
+		r.Handle(
+			h.method,
+			h.path,
+			h.handler,
+		)
+	}
+	return nil
 }
 
 type crudRouterReturnType struct {
@@ -122,7 +140,7 @@ func CRUDRouter(c *Collection) []crudRouterReturnType {
 			return
 		}
 
-		ctx.ResponseOk(http.StatusOK, v)
+		ctx.ResponseOk(http.StatusCreated, v)
 	}
 
 	// handle delete to collection
