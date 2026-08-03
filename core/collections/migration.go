@@ -98,10 +98,15 @@ func addColumns(db *gorm.DB, tableName string, fields []SchemaField) error {
 			continue
 		}
 
+		// Validate field name
+		if !IsValidFieldName(field.Name) {
+			return fmt.Errorf("invalid field name %q: must contain only letters, numbers, and underscores", field.Name)
+		}
+
 		sqlType := fieldTypeToSQLType(field.Type)
 		defaultVal := fieldDefaultValue(field.Type)
 
-		sql := fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s DEFAULT %s",
+		sql := fmt.Sprintf("ALTER TABLE \"%s\" ADD COLUMN \"%s\" %s DEFAULT %s",
 			tableName, field.Name, sqlType, defaultVal)
 
 		if err := db.Exec(sql).Error; err != nil {
@@ -109,6 +114,27 @@ func addColumns(db *gorm.DB, tableName string, fields []SchemaField) error {
 		}
 	}
 	return nil
+}
+
+// IsValidFieldName checks if a field name is valid (alphanumeric and underscores only)
+func IsValidFieldName(name string) bool {
+	if len(name) == 0 {
+		return false
+	}
+	for i, c := range name {
+		if i == 0 {
+			// First character must be letter or underscore
+			if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_') {
+				return false
+			}
+		} else {
+			// Subsequent characters can be letter, digit, or underscore
+			if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_') {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // recreateTable recreates the table with the new schema, preserving data in common columns
@@ -156,8 +182,13 @@ func createTable(db *gorm.DB, tableName string, fields []SchemaField) error {
 	var columns []string
 
 	for _, field := range fields {
+		// Validate field name
+		if !IsValidFieldName(field.Name) {
+			return fmt.Errorf("invalid field name %q: must contain only letters, numbers, and underscores", field.Name)
+		}
+
 		sqlType := fieldTypeToSQLType(field.Type)
-		colDef := fmt.Sprintf("%s %s", field.Name, sqlType)
+		colDef := fmt.Sprintf("\"%s\" %s", field.Name, sqlType)
 
 		if field.Name == "id" {
 			colDef += " PRIMARY KEY AUTOINCREMENT"
@@ -168,7 +199,7 @@ func createTable(db *gorm.DB, tableName string, fields []SchemaField) error {
 		columns = append(columns, colDef)
 	}
 
-	createSQL := fmt.Sprintf("CREATE TABLE %s (%s)", tableName, strings.Join(columns, ", "))
+	createSQL := fmt.Sprintf("CREATE TABLE \"%s\" (%s)", tableName, strings.Join(columns, ", "))
 	return db.Exec(createSQL).Error
 }
 
@@ -191,10 +222,12 @@ func findPreservedColumns(oldFields, newFields []SchemaField) []string {
 // fieldTypeToSQLType converts schema field type to SQLite type
 func fieldTypeToSQLType(fieldType SchemaFieldType) string {
 	switch fieldType {
-	case FieldText:
+	case FieldText, FieldEmail, FieldURL, FieldDate, FieldSelect, FieldJSON:
 		return "TEXT"
 	case FieldNumber:
 		return "INTEGER"
+	case FieldBool:
+		return "INTEGER" // SQLite has no BOOL, use 0/1
 	default:
 		return "TEXT"
 	}
@@ -205,6 +238,10 @@ func fieldDefaultValue(fieldType SchemaFieldType) string {
 	switch fieldType {
 	case FieldNumber:
 		return "0"
+	case FieldBool:
+		return "0" // false
+	case FieldJSON:
+		return "'null'"
 	default:
 		return "''"
 	}

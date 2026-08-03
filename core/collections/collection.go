@@ -55,7 +55,8 @@ func (c *Collection) CreateTypeWithValidation() (reflect.Type, error) {
 		n := utils.CapFirstChar(c.Fields[i].Name)
 
 		switch fieldType {
-		case "TEXT":
+		case "TEXT", "EMAIL", "URL", "DATE", "SELECT":
+			// All stored as strings
 			f = append(f, reflect.StructField{
 				Name: n,
 				Type: reflect.TypeOf(""),
@@ -65,6 +66,19 @@ func (c *Collection) CreateTypeWithValidation() (reflect.Type, error) {
 			f = append(f, reflect.StructField{
 				Name: n,
 				Type: reflect.TypeOf(0),
+				Tag:  reflect.StructTag(fmt.Sprintf(`json:"%s"`, utils.ToSnakeUnsafe(n))),
+			})
+		case "BOOL":
+			f = append(f, reflect.StructField{
+				Name: n,
+				Type: reflect.TypeOf(false),
+				Tag:  reflect.StructTag(fmt.Sprintf(`json:"%s"`, utils.ToSnakeUnsafe(n))),
+			})
+		case "JSON":
+			// Use interface{} for arbitrary JSON
+			f = append(f, reflect.StructField{
+				Name: n,
+				Type: reflect.TypeOf((*interface{})(nil)).Elem(),
 				Tag:  reflect.StructTag(fmt.Sprintf(`json:"%s"`, utils.ToSnakeUnsafe(n))),
 			})
 		default:

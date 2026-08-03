@@ -1,5 +1,5 @@
-import { createSignal, onMount, For, Show } from 'solid-js';
-import { api, Collection } from '../api/client';
+import { createSignal, onMount, For, Show, JSX } from 'solid-js';
+import { api, Collection, SchemaField } from '../api/client';
 
 interface CollectionViewProps {
   name: string;
@@ -44,12 +44,29 @@ export function CollectionView(props: CollectionViewProps) {
     e.preventDefault();
     const data: Record<string, unknown> = {};
 
-    // Convert string values to appropriate types
+    // Convert string values to appropriate types based on field type
     for (const [key, value] of Object.entries(newRecord())) {
       if (key === 'id') continue;
-      // Try to parse as number
-      const num = Number(value);
-      data[key] = isNaN(num) ? value : num;
+      const field = getField(key);
+      const fieldType = field?.type || 'TEXT';
+
+      switch (fieldType) {
+        case 'NUMBER':
+          data[key] = value === '' ? 0 : Number(value);
+          break;
+        case 'BOOL':
+          data[key] = value === 'true' || value === '1';
+          break;
+        case 'JSON':
+          try {
+            data[key] = value ? JSON.parse(value) : null;
+          } catch {
+            data[key] = value;
+          }
+          break;
+        default:
+          data[key] = value;
+      }
     }
 
     const response = await api.createRecord(props.name, data);
@@ -92,11 +109,28 @@ export function CollectionView(props: CollectionViewProps) {
 
     const data: Record<string, unknown> = {};
 
-    // Convert string values to appropriate types
+    // Convert string values to appropriate types based on field type
     for (const [key, value] of Object.entries(editFormData())) {
-      // Try to parse as number
-      const num = Number(value);
-      data[key] = isNaN(num) ? value : num;
+      const field = getField(key);
+      const fieldType = field?.type || 'TEXT';
+
+      switch (fieldType) {
+        case 'NUMBER':
+          data[key] = value === '' ? 0 : Number(value);
+          break;
+        case 'BOOL':
+          data[key] = value === 'true' || value === '1';
+          break;
+        case 'JSON':
+          try {
+            data[key] = value ? JSON.parse(value) : null;
+          } catch {
+            data[key] = value;
+          }
+          break;
+        default:
+          data[key] = value;
+      }
     }
 
     const response = await api.updateRecord(props.name, record.id as number, data);
@@ -106,6 +140,96 @@ export function CollectionView(props: CollectionViewProps) {
       setEditingRecord(null);
       setEditFormData({});
       await fetchRecords();
+    }
+  };
+
+  // Get field definition by column name
+  const getField = (columnName: string): SchemaField | undefined => {
+    return collection()?.fields.find(f => f.name === columnName);
+  };
+
+  // Render appropriate input based on field type
+  const renderInput = (
+    column: string,
+    value: string,
+    onChange: (value: string) => void
+  ): JSX.Element => {
+    const field = getField(column);
+    const fieldType = field?.type || 'TEXT';
+
+    switch (fieldType) {
+      case 'NUMBER':
+        return (
+          <input
+            type="number"
+            value={value}
+            onInput={(e) => onChange(e.currentTarget.value)}
+          />
+        );
+      case 'BOOL':
+        return (
+          <select
+            value={value === 'true' || value === '1' ? 'true' : 'false'}
+            onChange={(e) => onChange(e.currentTarget.value)}
+          >
+            <option value="false">False</option>
+            <option value="true">True</option>
+          </select>
+        );
+      case 'SELECT':
+        return (
+          <select
+            value={value}
+            onChange={(e) => onChange(e.currentTarget.value)}
+          >
+            <option value="">-- Select --</option>
+            <For each={field?.select_options || []}>
+              {(option) => <option value={option}>{option}</option>}
+            </For>
+          </select>
+        );
+      case 'DATE':
+        return (
+          <input
+            type="date"
+            value={value}
+            onInput={(e) => onChange(e.currentTarget.value)}
+          />
+        );
+      case 'EMAIL':
+        return (
+          <input
+            type="email"
+            value={value}
+            onInput={(e) => onChange(e.currentTarget.value)}
+          />
+        );
+      case 'URL':
+        return (
+          <input
+            type="url"
+            value={value}
+            placeholder="https://..."
+            onInput={(e) => onChange(e.currentTarget.value)}
+          />
+        );
+      case 'JSON':
+        return (
+          <textarea
+            value={value}
+            placeholder='{"key": "value"}'
+            onInput={(e) => onChange(e.currentTarget.value)}
+            rows={3}
+          />
+        );
+      default: // TEXT
+        return (
+          <input
+            type="text"
+            value={value}
+            onInput={(e) => onChange(e.currentTarget.value)}
+          />
+        );
     }
   };
 
@@ -148,13 +272,11 @@ export function CollectionView(props: CollectionViewProps) {
                 {(column) => (
                   <div class="form-group">
                     <label>{column}</label>
-                    <input
-                      type="text"
-                      value={newRecord()[column] || ''}
-                      onInput={(e) =>
-                        setNewRecord({ ...newRecord(), [column]: e.currentTarget.value })
-                      }
-                    />
+                    {renderInput(
+                      column,
+                      newRecord()[column] || '',
+                      (value) => setNewRecord({ ...newRecord(), [column]: value })
+                    )}
                   </div>
                 )}
               </For>
@@ -180,13 +302,11 @@ export function CollectionView(props: CollectionViewProps) {
                 {(column) => (
                   <div class="form-group">
                     <label>{column}</label>
-                    <input
-                      type="text"
-                      value={editFormData()[column] || ''}
-                      onInput={(e) =>
-                        setEditFormData({ ...editFormData(), [column]: e.currentTarget.value })
-                      }
-                    />
+                    {renderInput(
+                      column,
+                      editFormData()[column] || '',
+                      (value) => setEditFormData({ ...editFormData(), [column]: value })
+                    )}
                   </div>
                 )}
               </For>

@@ -14,8 +14,9 @@ export type View =
 export interface SchemaField {
   id?: number;
   name: string;
-  type: 'TEXT' | 'NUMBER';
+  type: 'TEXT' | 'NUMBER' | 'BOOL' | 'EMAIL' | 'URL' | 'DATE' | 'SELECT' | 'JSON';
   required: boolean;
+  select_options?: string[];
   collection_id?: number;
 }
 

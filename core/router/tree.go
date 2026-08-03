@@ -166,28 +166,53 @@ func (n *node) Get(url string) (Handle, []Param, error) {
 		}
 		var match *node
 
-	matchBreak:
+		// First pass: find param/wild match as fallback
+		var paramMatch *node
+		var paramValue Param
 		for _, child := range current.children {
-			// switch based on nodetype
 			switch child.nodeType {
 			case nodeTypeParams:
-				// store the value of param
-				params = append(params, extractParamWithoutQuery(child, url, s, endIndex))
-				match = child
-				break matchBreak
+				if paramMatch == nil {
+					paramMatch = child
+					paramValue = extractParamWithoutQuery(child, url, s, endIndex)
+				}
 			case nodeTypeWild:
+				paramMatch = child
+				paramValue = extractParamWithoutQuery(child, url, s, lenUrl)
+			}
+		}
+
+		// Second pass: find static match, preferring param if static has no handler at final segment
+	matchBreak:
+		for _, child := range current.children {
+			switch child.nodeType {
+			case nodeTypeParams:
+				// Skip, already handled in first pass
+				continue
+			case nodeTypeWild:
+				// Wild card match - use it and consume rest of URL
 				endIndex = lenUrl
-				// store the value of wild
-				params = append(params, extractParamWithoutQuery(child, url, s, endIndex))
+				params = append(params, paramValue)
 				match = child
 				break matchBreak
 			default:
-				// handle the static node type
+				// Static node
 				if child.path == path {
+					// If this is the final segment, static has no handler, and we have a param match with handler
+					// prefer the param match
+					if endIndex >= lenUrl && child.handler == nil && paramMatch != nil && paramMatch.handler != nil {
+						continue
+					}
 					match = child
 					break matchBreak
 				}
 			}
+		}
+
+		// If no static match found, use param match
+		if match == nil && paramMatch != nil {
+			params = append(params, paramValue)
+			match = paramMatch
 		}
 
 		if match == nil {

@@ -2,10 +2,14 @@ import { createSignal, For, Show } from 'solid-js';
 import { createStore, produce } from 'solid-js/store';
 import { api, Collection } from '../api/client';
 
+type FieldType = 'TEXT' | 'NUMBER' | 'BOOL' | 'EMAIL' | 'URL' | 'DATE' | 'SELECT' | 'JSON';
+
 interface Field {
   name: string;
-  type: 'TEXT' | 'NUMBER';
+  type: FieldType;
   required: boolean;
+  select_options?: string[];
+  select_options_text?: string; // Raw input text for editing
 }
 
 interface SchemaBuilderProps {
@@ -27,6 +31,8 @@ export function SchemaBuilder(props: SchemaBuilderProps) {
           name: f.name,
           type: f.type,
           required: f.required,
+          select_options: f.select_options,
+          select_options_text: (f.select_options || []).join(', '),
         }));
     }
     return [{ name: '', type: 'TEXT', required: false }];
@@ -76,11 +82,19 @@ export function SchemaBuilder(props: SchemaBuilderProps) {
 
     setSaving(true);
 
-    const fieldData = validFields.map((f) => ({
-      name: f.name.trim(),
-      type: f.type,
-      required: f.required,
-    }));
+    const fieldData = validFields.map((f) => {
+      // Parse select_options from text if available
+      let selectOptions = f.select_options;
+      if (f.type === 'SELECT' && f.select_options_text) {
+        selectOptions = f.select_options_text.split(',').map(s => s.trim()).filter(Boolean);
+      }
+      return {
+        name: f.name.trim(),
+        type: f.type,
+        required: f.required,
+        ...(f.type === 'SELECT' && selectOptions && selectOptions.length > 0 ? { select_options: selectOptions } : {}),
+      };
+    });
 
     let response;
     if (isEditMode()) {
@@ -173,13 +187,35 @@ export function SchemaBuilder(props: SchemaBuilderProps) {
                     <select
                       value={field.type}
                       onChange={(e) =>
-                        updateField(index(), 'type', e.currentTarget.value as 'TEXT' | 'NUMBER')
+                        updateField(index(), 'type', e.currentTarget.value as FieldType)
                       }
                       class="field-type-select"
                     >
                       <option value="TEXT">TEXT</option>
                       <option value="NUMBER">NUMBER</option>
+                      <option value="BOOL">BOOL</option>
+                      <option value="EMAIL">EMAIL</option>
+                      <option value="URL">URL</option>
+                      <option value="DATE">DATE</option>
+                      <option value="SELECT">SELECT</option>
+                      <option value="JSON">JSON</option>
                     </select>
+
+                    <Show when={field.type === 'SELECT'}>
+                      <input
+                        type="text"
+                        placeholder="Options (comma-separated)"
+                        value={field.select_options_text ?? ''}
+                        onInput={(e) => {
+                          updateField(index(), 'select_options_text', e.currentTarget.value);
+                        }}
+                        onBlur={(e) => {
+                          const options = e.currentTarget.value.split(',').map(s => s.trim()).filter(Boolean);
+                          updateField(index(), 'select_options', options as unknown as string);
+                        }}
+                        class="field-options-input"
+                      />
+                    </Show>
 
                     <label class="checkbox-label">
                       <input

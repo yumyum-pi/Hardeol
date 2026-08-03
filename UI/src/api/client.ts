@@ -9,8 +9,9 @@ export interface ApiResponse<T> {
 export interface SchemaField {
   id?: number;
   name: string;
-  type: 'TEXT' | 'NUMBER';
+  type: 'TEXT' | 'NUMBER' | 'BOOL' | 'EMAIL' | 'URL' | 'DATE' | 'SELECT' | 'JSON';
   required: boolean;
+  select_options?: string[]; // For SELECT type
   collection_id?: number;
 }
 

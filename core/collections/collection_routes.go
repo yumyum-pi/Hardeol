@@ -46,6 +46,14 @@ func collectionsHandleCreate(ctx *router.Ctx) {
 		return
 	}
 
+	// validate field names
+	for _, field := range col.Fields {
+		if !IsValidFieldName(field.Name) {
+			ctx.ResponseError(http.StatusBadRequest, "Invalid field name '"+field.Name+"': must start with letter, contain only letters, numbers, and underscores")
+			return
+		}
+	}
+
 	// atomically check if name exists and reserve it (prevents TOCTOU race)
 	if !CollectionNameAddIfNotExists(col.Name) {
 		ctx.ResponseError(http.StatusBadRequest, "collection name is not unique")
@@ -106,6 +114,14 @@ func collectionsHandleUpdate(ctx *router.Ctx) {
 	if err := json.NewDecoder(ctx.Request.Body).Decode(&req); err != nil {
 		ctx.ResponseError(http.StatusBadRequest, "Invalid JSON input: "+err.Error())
 		return
+	}
+
+	// Validate field names
+	for _, field := range req.Fields {
+		if !IsValidFieldName(field.Name) {
+			ctx.ResponseError(http.StatusBadRequest, "Invalid field name '"+field.Name+"': must start with letter, contain only letters, numbers, and underscores")
+			return
+		}
 	}
 
 	db := database.Get()
