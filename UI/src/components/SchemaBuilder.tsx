@@ -1,4 +1,5 @@
 import { createSignal, For, Show } from 'solid-js';
+import { createStore, produce } from 'solid-js/store';
 import { api } from '../api/client';
 
 interface Field {
@@ -14,26 +15,22 @@ interface SchemaBuilderProps {
 
 export function SchemaBuilder(props: SchemaBuilderProps) {
   const [name, setName] = createSignal('');
-  const [fields, setFields] = createSignal<Field[]>([
+  const [fields, setFields] = createStore<Field[]>([
     { name: '', type: 'TEXT', required: false },
   ]);
   const [error, setError] = createSignal<string | null>(null);
   const [saving, setSaving] = createSignal(false);
 
   const addField = () => {
-    setFields([...fields(), { name: '', type: 'TEXT', required: false }]);
+    setFields(produce((f) => f.push({ name: '', type: 'TEXT', required: false })));
   };
 
   const removeField = (index: number) => {
-    setFields(fields().filter((_, i) => i !== index));
+    setFields(produce((f) => f.splice(index, 1)));
   };
 
   const updateField = (index: number, key: keyof Field, value: string | boolean) => {
-    setFields(
-      fields().map((field, i) =>
-        i === index ? { ...field, [key]: value } : field
-      )
-    );
+    setFields(index, key, value as never);
   };
 
   const handleSubmit = async (e: Event) => {
@@ -46,7 +43,7 @@ export function SchemaBuilder(props: SchemaBuilderProps) {
       return;
     }
 
-    const validFields = fields().filter((f) => f.name.trim());
+    const validFields = fields.filter((f) => f.name.trim());
     if (validFields.length === 0) {
       setError('At least one field is required');
       return;
@@ -115,7 +112,7 @@ export function SchemaBuilder(props: SchemaBuilderProps) {
           </div>
 
           <div class="fields-list">
-            <For each={fields()}>
+            <For each={fields}>
               {(field, index) => (
                 <div class="field-row">
                   <div class="field-inputs">
@@ -156,7 +153,7 @@ export function SchemaBuilder(props: SchemaBuilderProps) {
                     type="button"
                     class="btn btn-icon btn-danger"
                     onClick={() => removeField(index())}
-                    disabled={fields().length === 1}
+                    disabled={fields.length === 1}
                     title="Remove field"
                   >
                     &times;
