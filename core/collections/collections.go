@@ -20,6 +20,7 @@ func Init(r *router.DynamicRouter) {
 	// make the db call
 	database.Migrate(&SchemaField{})
 	database.Migrate(&Collection{})
+	database.Migrate(&TableView{})
 
 	db := database.Get()
 	c = make([]Collection, 0)
@@ -61,8 +62,19 @@ func newCollection(cc Collection, db *gorm.DB, r *router.DynamicRouter) {
 		return
 	}
 
+	// Register CRUD routes
 	handlers := CRUDRouter(&cc)
 	for _, h := range handlers {
+		r.Handle(
+			h.method,
+			h.path,
+			h.handler,
+		)
+	}
+
+	// Register table view routes
+	viewHandlers := TableViewRouter(&cc)
+	for _, h := range viewHandlers {
 		r.Handle(
 			h.method,
 			h.path,
@@ -78,6 +90,7 @@ func newCollectionRoutes(cc Collection, db *gorm.DB, r *router.DynamicRouter) er
 		return err
 	}
 
+	// Register CRUD routes
 	handlers := CRUDRouter(&cc)
 	for _, h := range handlers {
 		r.Handle(
@@ -86,6 +99,17 @@ func newCollectionRoutes(cc Collection, db *gorm.DB, r *router.DynamicRouter) er
 			h.handler,
 		)
 	}
+
+	// Register table view routes
+	viewHandlers := TableViewRouter(&cc)
+	for _, h := range viewHandlers {
+		r.Handle(
+			h.method,
+			h.path,
+			h.handler,
+		)
+	}
+
 	return nil
 }
 

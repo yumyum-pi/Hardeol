@@ -30,6 +30,20 @@ export interface UpdateCollectionRequest {
   fields: Omit<SchemaField, 'id' | 'collection_id'>[];
 }
 
+export interface ViewField {
+  name: string;
+  order: number;
+  css_class?: string;
+}
+
+export interface TableView {
+  id?: number;
+  name: string;
+  collection_id?: number;
+  fields: ViewField[];
+  is_default: boolean;
+}
+
 async function request<T>(
   endpoint: string,
   options?: RequestInit
@@ -86,6 +100,27 @@ export const api = {
 
   deleteRecord: (collectionName: string, id: number | string) =>
     request<string>(`/collection/${collectionName}/${id}`, {
+      method: 'DELETE',
+    }),
+
+  // Table Views
+  listViews: (collectionName: string) =>
+    request<TableView[]>(`/collection/${collectionName}/views`),
+
+  createView: (collectionName: string, data: Omit<TableView, 'id' | 'collection_id'>) =>
+    request<TableView>(`/collection/${collectionName}/views`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateView: (collectionName: string, viewId: number, data: Omit<TableView, 'id' | 'collection_id'>) =>
+    request<TableView>(`/collection/${collectionName}/views/${viewId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  deleteView: (collectionName: string, viewId: number) =>
+    request<string>(`/collection/${collectionName}/views/${viewId}`, {
       method: 'DELETE',
     }),
 };

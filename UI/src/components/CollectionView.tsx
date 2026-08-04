@@ -1,14 +1,15 @@
-import { createSignal, onMount, For, Show, Switch, Match } from 'solid-js';
+import { createSignal, createEffect, For, Show, Switch, Match } from 'solid-js';
 import { createStore } from 'solid-js/store';
-import { api, Collection, SchemaField } from '../api/client';
+import { useParams, useNavigate, useSearchParams, A } from '@solidjs/router';
+import { api, Collection, SchemaField, TableView } from '../api/client';
+import { ViewSelector } from './ViewSelector';
+import { ViewManager } from './ViewManager';
 
-interface CollectionViewProps {
-  name: string;
-  onBack: () => void;
-  onEditSchema?: (collection: Collection) => void;
-}
-
-export function CollectionView(props: CollectionViewProps) {
+export function CollectionView() {
+  const params = useParams();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const name = () => params.name;
   const [records, setRecords] = createSignal<Record<string, unknown>[]>([]);
   const [columns, setColumns] = createSignal<string[]>([]);
   const [loading, setLoading] = createSignal(true);
@@ -18,11 +19,14 @@ export function CollectionView(props: CollectionViewProps) {
   const [collection, setCollection] = createSignal<Collection | null>(null);
   const [editingRecord, setEditingRecord] = createSignal<Record<string, unknown> | null>(null);
   const [editFormData, setEditFormData] = createStore<Record<string, string>>({});
+  const [views, setViews] = createSignal<TableView[]>([]);
+  const [selectedViewId, setSelectedViewId] = createSignal<number | null>(null);
+  const [showViewManager, setShowViewManager] = createSignal(false);
 
   const fetchRecords = async () => {
     setLoading(true);
     setError(null);
-    const response = await api.listRecords(props.name);
+    const response = await api.listRecords(name());
     if (response.error) {
       setError(response.error);
     } else {
@@ -30,7 +34,7 @@ export function CollectionView(props: CollectionViewProps) {
       setRecords(data);
       // Fetch collection schema to get columns and store collection for editing
       const colResponse = await api.listCollections();
-      const col = colResponse.data?.find(c => c.name === props.name);
+      const col = colResponse.data?.find(c => c.name === name());
       if (col) {
         setCollection(col);
         setColumns(col.fields.map(f => f.name));
@@ -39,6 +43,57 @@ export function CollectionView(props: CollectionViewProps) {
       }
     }
     setLoading(false);
+  };
+
+  const fetchViews = async () => {
+    const response = await api.listViews(name());
+    if (response.data) {
+      setViews(response.data);
+      // If URL has view param, use it; otherwise use default view if exists
+      const urlViewId = searchParams.view ? Number(searchParams.view) : null;
+      if (urlViewId && response.data.some(v => v.id === urlViewId)) {
+        setSelectedViewId(urlViewId);
+      } else {
+        const defaultView = response.data.find(v => v.is_default);
+        if (defaultView?.id) {
+          setSelectedViewId(defaultView.id);
+          setSearchParams({ view: String(defaultView.id) });
+        }
+      }
+    }
+  };
+
+  const handleViewSelect = (viewId: number | null) => {
+    setSelectedViewId(viewId);
+    if (viewId) {
+      setSearchParams({ view: String(viewId) });
+    } else {
+      setSearchParams({ view: undefined });
+    }
+  };
+
+  // Get the currently selected view
+  const selectedView = () => views().find(v => v.id === selectedViewId());
+
+  // Get display columns based on selected view or all columns
+  const displayColumns = () => {
+    const view = selectedView();
+    if (view && view.fields.length > 0) {
+      // Sort by order and return field names
+      const sortedFields = [...view.fields].sort((a, b) => a.order - b.order);
+      return sortedFields.map(f => f.name);
+    }
+    return columns();
+  };
+
+  // Get CSS class for a column from the selected view
+  const getColumnCssClass = (columnName: string): string => {
+    const view = selectedView();
+    if (view) {
+      const field = view.fields.find(f => f.name === columnName);
+      return field?.css_class || '';
+    }
+    return '';
   };
 
   const handleAddRecord = async (e: Event) => {
@@ -64,7 +119,7 @@ export function CollectionView(props: CollectionViewProps) {
       }
     }
 
-    const response = await api.createRecord(props.name, data);
+    const response = await api.createRecord(name(), data);
     if (response.error) {
       setError(response.error);
     } else {
@@ -80,7 +135,7 @@ export function CollectionView(props: CollectionViewProps) {
   const handleDelete = async (id: number | string) => {
     if (!confirm('Are you sure you want to delete this record?')) return;
 
-    const response = await api.deleteRecord(props.name, id);
+    const response = await api.deleteRecord(name(), id);
     if (response.error) {
       setError(response.error);
     } else {
@@ -123,7 +178,7 @@ export function CollectionView(props: CollectionViewProps) {
       }
     }
 
-    const response = await api.updateRecord(props.name, record.id as number, data);
+    const response = await api.updateRecord(name(), record.id as number, data);
     if (response.error) {
       setError(response.error);
     } else {
@@ -141,25 +196,35 @@ export function CollectionView(props: CollectionViewProps) {
     return collection()?.fields.find(f => f.name === columnName);
   };
 
-  onMount(fetchRecords);
+  // Refetch when collection name changes
+  createEffect(() => {
+    const currentName = name(); // Track the name parameter
+    if (currentName) {
+      fetchRecords();
+      fetchViews();
+    }
+  });
 
   return (
     <div class="collection-view">
       <header class="page-header">
         <div class="header-left">
-          <button class="btn btn-text" onClick={props.onBack}>
+          <A href="/" class="btn btn-text">
             &larr; Back
-          </button>
-          <h2>{props.name}</h2>
+          </A>
+          <h2>{name()}</h2>
         </div>
         <div class="header-actions">
-          <Show when={props.onEditSchema && collection()}>
-            <button
-              class="btn"
-              onClick={() => props.onEditSchema?.(collection()!)}
-            >
+          <ViewSelector
+            views={views()}
+            selectedViewId={selectedViewId()}
+            onSelect={handleViewSelect}
+            onManage={() => setShowViewManager(true)}
+          />
+          <Show when={collection()}>
+            <A href={`/collection/${name()}/edit`} class="btn">
               Edit Schema
-            </button>
+            </A>
           </Show>
           <button class="btn btn-primary" onClick={() => setShowAddForm(true)}>
             + Add Record
@@ -377,8 +442,8 @@ export function CollectionView(props: CollectionViewProps) {
           <table class="data-table">
             <thead>
               <tr>
-                <For each={columns()}>
-                  {(column) => <th>{column}</th>}
+                <For each={displayColumns()}>
+                  {(column) => <th class={getColumnCssClass(column)}>{column}</th>}
                 </For>
                 <th class="actions-col">Actions</th>
               </tr>
@@ -387,8 +452,8 @@ export function CollectionView(props: CollectionViewProps) {
               <For each={records()}>
                 {(record) => (
                   <tr>
-                    <For each={columns()}>
-                      {(column) => <td>{String(record[column] ?? '')}</td>}
+                    <For each={displayColumns()}>
+                      {(column) => <td class={getColumnCssClass(column)}>{String(record[column] ?? '')}</td>}
                     </For>
                     <td class="actions-col">
                       <button
@@ -410,6 +475,19 @@ export function CollectionView(props: CollectionViewProps) {
             </tbody>
           </table>
         </div>
+      </Show>
+
+      <Show when={showViewManager() && collection()}>
+        <ViewManager
+          collectionName={name()}
+          schemaFields={collection()!.fields}
+          views={views()}
+          onClose={() => setShowViewManager(false)}
+          onViewsChanged={() => {
+            fetchViews();
+            setShowViewManager(false);
+          }}
+        />
       </Show>
     </div>
   );
