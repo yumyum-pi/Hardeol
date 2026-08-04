@@ -75,10 +75,10 @@ func (c *Collection) CreateTypeWithValidation() (reflect.Type, error) {
 				Tag:  reflect.StructTag(fmt.Sprintf(`json:"%s"`, utils.ToSnakeUnsafe(n))),
 			})
 		case "JSON":
-			// Use interface{} for arbitrary JSON
+			// Store JSON as string (TEXT in SQLite), parse at API layer
 			f = append(f, reflect.StructField{
 				Name: n,
-				Type: reflect.TypeOf((*interface{})(nil)).Elem(),
+				Type: reflect.TypeOf(""),
 				Tag:  reflect.StructTag(fmt.Sprintf(`json:"%s"`, utils.ToSnakeUnsafe(n))),
 			})
 		default:

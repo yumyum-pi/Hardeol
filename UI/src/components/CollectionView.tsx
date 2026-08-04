@@ -58,14 +58,8 @@ export function CollectionView(props: CollectionViewProps) {
         case 'BOOL':
           data[key] = value === 'true' || value === '1';
           break;
-        case 'JSON':
-          try {
-            data[key] = value ? JSON.parse(value) : null;
-          } catch {
-            data[key] = value;
-          }
-          break;
         default:
+          // TEXT, EMAIL, URL, DATE, SELECT, JSON - all stored as strings
           data[key] = value;
       }
     }
@@ -123,14 +117,8 @@ export function CollectionView(props: CollectionViewProps) {
         case 'BOOL':
           data[key] = value === 'true' || value === '1';
           break;
-        case 'JSON':
-          try {
-            data[key] = value ? JSON.parse(value) : null;
-          } catch {
-            data[key] = value;
-          }
-          break;
         default:
+          // TEXT, EMAIL, URL, DATE, SELECT, JSON - all stored as strings
           data[key] = value;
       }
     }
