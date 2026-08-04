@@ -1,4 +1,5 @@
-import { createSignal, onMount, For, Show, JSX } from 'solid-js';
+import { createSignal, onMount, For, Show, Switch, Match } from 'solid-js';
+import { createStore } from 'solid-js/store';
 import { api, Collection, SchemaField } from '../api/client';
 
 interface CollectionViewProps {
@@ -13,10 +14,10 @@ export function CollectionView(props: CollectionViewProps) {
   const [loading, setLoading] = createSignal(true);
   const [error, setError] = createSignal<string | null>(null);
   const [showAddForm, setShowAddForm] = createSignal(false);
-  const [newRecord, setNewRecord] = createSignal<Record<string, string>>({});
+  const [newRecord, setNewRecord] = createStore<Record<string, string>>({});
   const [collection, setCollection] = createSignal<Collection | null>(null);
   const [editingRecord, setEditingRecord] = createSignal<Record<string, unknown> | null>(null);
-  const [editFormData, setEditFormData] = createSignal<Record<string, string>>({});
+  const [editFormData, setEditFormData] = createStore<Record<string, string>>({});
 
   const fetchRecords = async () => {
     setLoading(true);
@@ -45,7 +46,7 @@ export function CollectionView(props: CollectionViewProps) {
     const data: Record<string, unknown> = {};
 
     // Convert string values to appropriate types based on field type
-    for (const [key, value] of Object.entries(newRecord())) {
+    for (const [key, value] of Object.entries(newRecord)) {
       if (key === 'id') continue;
       const field = getField(key);
       const fieldType = field?.type || 'TEXT';
@@ -74,7 +75,10 @@ export function CollectionView(props: CollectionViewProps) {
       setError(response.error);
     } else {
       setShowAddForm(false);
-      setNewRecord({});
+      // Reset all fields
+      for (const key of Object.keys(newRecord)) {
+        setNewRecord(key, undefined as unknown as string);
+      }
       await fetchRecords();
     }
   };
@@ -93,13 +97,11 @@ export function CollectionView(props: CollectionViewProps) {
   const openEditForm = (record: Record<string, unknown>) => {
     setEditingRecord(record);
     // Convert all values to strings for the form
-    const formData: Record<string, string> = {};
     for (const [key, value] of Object.entries(record)) {
       if (key !== 'id') {
-        formData[key] = String(value ?? '');
+        setEditFormData(key, String(value ?? ''));
       }
     }
-    setEditFormData(formData);
   };
 
   const handleEditRecord = async (e: Event) => {
@@ -110,7 +112,7 @@ export function CollectionView(props: CollectionViewProps) {
     const data: Record<string, unknown> = {};
 
     // Convert string values to appropriate types based on field type
-    for (const [key, value] of Object.entries(editFormData())) {
+    for (const [key, value] of Object.entries(editFormData)) {
       const field = getField(key);
       const fieldType = field?.type || 'TEXT';
 
@@ -138,7 +140,10 @@ export function CollectionView(props: CollectionViewProps) {
       setError(response.error);
     } else {
       setEditingRecord(null);
-      setEditFormData({});
+      // Reset all fields
+      for (const key of Object.keys(editFormData)) {
+        setEditFormData(key, undefined as unknown as string);
+      }
       await fetchRecords();
     }
   };
@@ -146,91 +151,6 @@ export function CollectionView(props: CollectionViewProps) {
   // Get field definition by column name
   const getField = (columnName: string): SchemaField | undefined => {
     return collection()?.fields.find(f => f.name === columnName);
-  };
-
-  // Render appropriate input based on field type
-  const renderInput = (
-    column: string,
-    value: string,
-    onChange: (value: string) => void
-  ): JSX.Element => {
-    const field = getField(column);
-    const fieldType = field?.type || 'TEXT';
-
-    switch (fieldType) {
-      case 'NUMBER':
-        return (
-          <input
-            type="number"
-            value={value}
-            onInput={(e) => onChange(e.currentTarget.value)}
-          />
-        );
-      case 'BOOL':
-        return (
-          <select
-            value={value === 'true' || value === '1' ? 'true' : 'false'}
-            onChange={(e) => onChange(e.currentTarget.value)}
-          >
-            <option value="false">False</option>
-            <option value="true">True</option>
-          </select>
-        );
-      case 'SELECT':
-        return (
-          <select
-            value={value}
-            onChange={(e) => onChange(e.currentTarget.value)}
-          >
-            <option value="">-- Select --</option>
-            <For each={field?.select_options || []}>
-              {(option) => <option value={option}>{option}</option>}
-            </For>
-          </select>
-        );
-      case 'DATE':
-        return (
-          <input
-            type="date"
-            value={value}
-            onInput={(e) => onChange(e.currentTarget.value)}
-          />
-        );
-      case 'EMAIL':
-        return (
-          <input
-            type="email"
-            value={value}
-            onInput={(e) => onChange(e.currentTarget.value)}
-          />
-        );
-      case 'URL':
-        return (
-          <input
-            type="url"
-            value={value}
-            placeholder="https://..."
-            onInput={(e) => onChange(e.currentTarget.value)}
-          />
-        );
-      case 'JSON':
-        return (
-          <textarea
-            value={value}
-            placeholder='{"key": "value"}'
-            onInput={(e) => onChange(e.currentTarget.value)}
-            rows={3}
-          />
-        );
-      default: // TEXT
-        return (
-          <input
-            type="text"
-            value={value}
-            onInput={(e) => onChange(e.currentTarget.value)}
-          />
-        );
-    }
   };
 
   onMount(fetchRecords);
@@ -269,16 +189,80 @@ export function CollectionView(props: CollectionViewProps) {
             <h3>Add Record</h3>
             <form onSubmit={handleAddRecord}>
               <For each={columns().filter(c => c !== 'id')}>
-                {(column) => (
-                  <div class="form-group">
-                    <label>{column}</label>
-                    {renderInput(
-                      column,
-                      newRecord()[column] || '',
-                      (value) => setNewRecord({ ...newRecord(), [column]: value })
-                    )}
-                  </div>
-                )}
+                {(column) => {
+                  const field = () => getField(column);
+                  const fieldType = () => field()?.type || 'TEXT';
+                  return (
+                    <div class="form-group">
+                      <label>{column}</label>
+                      <Switch fallback={
+                        <input
+                          type="text"
+                          value={newRecord[column] || ''}
+                          onInput={(e) => setNewRecord(column, e.currentTarget.value)}
+                        />
+                      }>
+                        <Match when={fieldType() === 'NUMBER'}>
+                          <input
+                            type="number"
+                            value={newRecord[column] || ''}
+                            onInput={(e) => setNewRecord(column, e.currentTarget.value)}
+                          />
+                        </Match>
+                        <Match when={fieldType() === 'BOOL'}>
+                          <select
+                            value={newRecord[column] === 'true' || newRecord[column] === '1' ? 'true' : 'false'}
+                            onChange={(e) => setNewRecord(column, e.currentTarget.value)}
+                          >
+                            <option value="false">False</option>
+                            <option value="true">True</option>
+                          </select>
+                        </Match>
+                        <Match when={fieldType() === 'SELECT'}>
+                          <select
+                            value={newRecord[column] || ''}
+                            onChange={(e) => setNewRecord(column, e.currentTarget.value)}
+                          >
+                            <option value="">-- Select --</option>
+                            <For each={field()?.select_options || []}>
+                              {(option) => <option value={option}>{option}</option>}
+                            </For>
+                          </select>
+                        </Match>
+                        <Match when={fieldType() === 'DATE'}>
+                          <input
+                            type="date"
+                            value={newRecord[column] || ''}
+                            onInput={(e) => setNewRecord(column, e.currentTarget.value)}
+                          />
+                        </Match>
+                        <Match when={fieldType() === 'EMAIL'}>
+                          <input
+                            type="email"
+                            value={newRecord[column] || ''}
+                            onInput={(e) => setNewRecord(column, e.currentTarget.value)}
+                          />
+                        </Match>
+                        <Match when={fieldType() === 'URL'}>
+                          <input
+                            type="url"
+                            placeholder="https://..."
+                            value={newRecord[column] || ''}
+                            onInput={(e) => setNewRecord(column, e.currentTarget.value)}
+                          />
+                        </Match>
+                        <Match when={fieldType() === 'JSON'}>
+                          <textarea
+                            placeholder='{"key": "value"}'
+                            value={newRecord[column] || ''}
+                            onInput={(e) => setNewRecord(column, e.currentTarget.value)}
+                            rows={3}
+                          />
+                        </Match>
+                      </Switch>
+                    </div>
+                  );
+                }}
               </For>
               <div class="form-actions">
                 <button type="button" class="btn" onClick={() => setShowAddForm(false)}>
@@ -299,16 +283,80 @@ export function CollectionView(props: CollectionViewProps) {
             <h3>Edit Record (ID: {editingRecord()?.id as number})</h3>
             <form onSubmit={handleEditRecord}>
               <For each={columns().filter(c => c !== 'id')}>
-                {(column) => (
-                  <div class="form-group">
-                    <label>{column}</label>
-                    {renderInput(
-                      column,
-                      editFormData()[column] || '',
-                      (value) => setEditFormData({ ...editFormData(), [column]: value })
-                    )}
-                  </div>
-                )}
+                {(column) => {
+                  const field = () => getField(column);
+                  const fieldType = () => field()?.type || 'TEXT';
+                  return (
+                    <div class="form-group">
+                      <label>{column}</label>
+                      <Switch fallback={
+                        <input
+                          type="text"
+                          value={editFormData[column] || ''}
+                          onInput={(e) => setEditFormData(column, e.currentTarget.value)}
+                        />
+                      }>
+                        <Match when={fieldType() === 'NUMBER'}>
+                          <input
+                            type="number"
+                            value={editFormData[column] || ''}
+                            onInput={(e) => setEditFormData(column, e.currentTarget.value)}
+                          />
+                        </Match>
+                        <Match when={fieldType() === 'BOOL'}>
+                          <select
+                            value={editFormData[column] === 'true' || editFormData[column] === '1' ? 'true' : 'false'}
+                            onChange={(e) => setEditFormData(column, e.currentTarget.value)}
+                          >
+                            <option value="false">False</option>
+                            <option value="true">True</option>
+                          </select>
+                        </Match>
+                        <Match when={fieldType() === 'SELECT'}>
+                          <select
+                            value={editFormData[column] || ''}
+                            onChange={(e) => setEditFormData(column, e.currentTarget.value)}
+                          >
+                            <option value="">-- Select --</option>
+                            <For each={field()?.select_options || []}>
+                              {(option) => <option value={option}>{option}</option>}
+                            </For>
+                          </select>
+                        </Match>
+                        <Match when={fieldType() === 'DATE'}>
+                          <input
+                            type="date"
+                            value={editFormData[column] || ''}
+                            onInput={(e) => setEditFormData(column, e.currentTarget.value)}
+                          />
+                        </Match>
+                        <Match when={fieldType() === 'EMAIL'}>
+                          <input
+                            type="email"
+                            value={editFormData[column] || ''}
+                            onInput={(e) => setEditFormData(column, e.currentTarget.value)}
+                          />
+                        </Match>
+                        <Match when={fieldType() === 'URL'}>
+                          <input
+                            type="url"
+                            placeholder="https://..."
+                            value={editFormData[column] || ''}
+                            onInput={(e) => setEditFormData(column, e.currentTarget.value)}
+                          />
+                        </Match>
+                        <Match when={fieldType() === 'JSON'}>
+                          <textarea
+                            placeholder='{"key": "value"}'
+                            value={editFormData[column] || ''}
+                            onInput={(e) => setEditFormData(column, e.currentTarget.value)}
+                            rows={3}
+                          />
+                        </Match>
+                      </Switch>
+                    </div>
+                  );
+                }}
               </For>
               <div class="form-actions">
                 <button type="button" class="btn" onClick={() => setEditingRecord(null)}>
