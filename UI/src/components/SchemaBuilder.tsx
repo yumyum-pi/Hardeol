@@ -60,6 +60,46 @@ export function SchemaBuilder(props: SchemaBuilderProps) {
     setFields(produce((f) => f.splice(index, 1)));
   };
 
+ const nameTransformer = (input:string):string => { 
+	if (input.length == 0) {
+		return "";
+	}
+
+const diff = 97-65;
+
+	let newString = ""	
+	let char = ""
+
+	for (let i = 0; i < input.length; i++) {
+		char = input[i];
+		switch(true) {
+			// check if char is space
+			case char == ' ' : {
+				newString += '_';
+				break;
+			}
+
+			// check if char is small case
+			case char >= 'a' && char <='z': {
+				newString +=char;
+				break;
+			}
+			case char >= 'A' && char <='Z': {
+				newString += String.fromCharCode(char.charCodeAt(0) + diff);
+				break;
+			}
+			case char == '_' : {
+				newString += '_';
+				break;
+			}
+			
+			default: { break; }
+
+		}
+	}
+return newString;
+ }
+
   const updateField = (index: number, key: keyof Field, value: string | boolean) => {
     setFields(index, key, value as never);
   };
@@ -178,12 +218,14 @@ export function SchemaBuilder(props: SchemaBuilderProps) {
                       type="text"
                       placeholder="Field name"
                       value={field.name}
-                      onInput={(e) =>
-                        updateField(index(), 'name', e.currentTarget.value)
+                      onInput={(e) =>{
+
+			const n = nameTransformer(e.currentTarget.value)
+                        updateField(index(), 'name', n)
+}
                       }
                       class="field-name-input"
                     />
-
                     <select
                       value={field.type}
                       onChange={(e) =>
