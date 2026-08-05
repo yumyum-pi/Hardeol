@@ -2,7 +2,9 @@
 
 # Go environment for macOS 10.15 compatibility
 export GOROOT=/opt/local/lib/go-1.22
-export GOTOOLCHAIN=local
+export OTOOLCHAIN=local
+export BUILD_DIR=./build
+export BUILD_NAME=hardeol_server  
 GO=$(GOROOT)/bin/go
 
 # Default target
@@ -12,7 +14,7 @@ all: build
 build: build-server build-ui
 
 build-server:
-	$(GO) build -o ./hardeol_server ./cmd/main.go
+	$(GO) build -o ${BUILD_DIR}/${BUILD_NAME} ./cmd/main.go
 
 build-ui:
 	cd UI && npm run build
