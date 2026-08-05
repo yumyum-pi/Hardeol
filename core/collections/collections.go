@@ -22,6 +22,7 @@ func Init(r *router.DynamicRouter) {
 	database.Migrate(&Collection{})
 	database.Migrate(&TableView{})
 	database.Migrate(&Section{})
+	database.Migrate(&FormView{})
 
 	db := database.Get()
 	c = make([]Collection, 0)
@@ -100,6 +101,16 @@ func newCollection(cc Collection, db *gorm.DB, r *router.DynamicRouter) {
 			h.handler,
 		)
 	}
+
+	// Register form view routes
+	formViewHandlers := FormViewRouter(&cc)
+	for _, h := range formViewHandlers {
+		r.Handle(
+			h.method,
+			h.path,
+			h.handler,
+		)
+	}
 }
 
 // newCollectionRoutes creates routes for a collection (used after DB insert)
@@ -140,6 +151,16 @@ func newCollectionRoutes(cc Collection, db *gorm.DB, r *router.DynamicRouter) er
 	// Register table view routes
 	viewHandlers := TableViewRouter(&cc)
 	for _, h := range viewHandlers {
+		r.Handle(
+			h.method,
+			h.path,
+			h.handler,
+		)
+	}
+
+	// Register form view routes
+	formViewHandlers := FormViewRouter(&cc)
+	for _, h := range formViewHandlers {
 		r.Handle(
 			h.method,
 			h.path,

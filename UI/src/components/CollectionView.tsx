@@ -1,9 +1,11 @@
 import { createSignal, createEffect, For, Show, Switch, Match } from 'solid-js';
 import { createStore, produce } from 'solid-js/store';
 import { useParams, useNavigate, useSearchParams, A } from '@solidjs/router';
-import { api, Collection, SchemaField, TableView, Section, FieldType } from '../api/client';
+import { api, Collection, SchemaField, TableView, Section, FieldType, FormView, FormFieldConfig } from '../api/client';
 import { ViewSelector } from './ViewSelector';
 import { ViewManager } from './ViewManager';
+import { FormViewSelector } from './FormViewSelector';
+import { FormViewManager } from './FormViewManager';
 
 interface LineItem {
   id?: number;
@@ -30,6 +32,13 @@ export function CollectionView() {
   const [selectedViewId, setSelectedViewId] = createSignal<number | null>(null);
   const [showViewManager, setShowViewManager] = createSignal(false);
   const [collapsedSections, setCollapsedSections] = createStore<Record<number, boolean>>({});
+
+  // Form view state
+  const [formViews, setFormViews] = createSignal<FormView[]>([]);
+  const [selectedCreateViewId, setSelectedCreateViewId] = createSignal<number | null>(null);
+  const [selectedUpdateViewId, setSelectedUpdateViewId] = createSignal<number | null>(null);
+  const [showFormViewManager, setShowFormViewManager] = createSignal(false);
+  const [showOptionsMenu, setShowOptionsMenu] = createSignal(false);
 
   // Line items state for TABLE fields
   const [lineItems, setLineItems] = createStore<Record<string, LineItem[]>>({});
@@ -81,6 +90,37 @@ export function CollectionView() {
     } else {
       setSearchParams({ view: undefined });
     }
+  };
+
+  const fetchFormViews = async () => {
+    const response = await api.listFormViews(name());
+    if (response.data) {
+      setFormViews(response.data);
+      // Set default views for CREATE and UPDATE
+      const createDefault = response.data.find(v => v.is_default && (v.action_type === 'CREATE' || v.action_type === 'ALL'));
+      const updateDefault = response.data.find(v => v.is_default && (v.action_type === 'UPDATE' || v.action_type === 'ALL'));
+      if (createDefault?.id) setSelectedCreateViewId(createDefault.id);
+      if (updateDefault?.id) setSelectedUpdateViewId(updateDefault.id);
+    }
+  };
+
+  // Get active form view for a given action type
+  const getActiveFormView = (actionType: 'CREATE' | 'UPDATE'): FormView | null => {
+    const viewId = actionType === 'CREATE' ? selectedCreateViewId() : selectedUpdateViewId();
+    if (!viewId) return null;
+    return formViews().find(v => v.id === viewId &&
+      (v.action_type === actionType || v.action_type === 'ALL')) || null;
+  };
+
+  // Get field config from active form view
+  const getFieldConfig = (fieldName: string, actionType: 'CREATE' | 'UPDATE'): FormFieldConfig | null => {
+    const view = getActiveFormView(actionType);
+    return view?.fields.find(f => f.name === fieldName) || null;
+  };
+
+  // Filter views by action type
+  const getFormViewsForAction = (actionType: 'CREATE' | 'UPDATE') => {
+    return formViews().filter(v => v.action_type === actionType || v.action_type === 'ALL');
   };
 
   const selectedView = () => views().find(v => v.id === selectedViewId());
@@ -518,6 +558,154 @@ export function CollectionView() {
     );
   };
 
+  // Render a single form field with form view config applied
+  const renderFormFieldWithConfig = (
+    field: SchemaField,
+    formData: Record<string, string>,
+    setFormData: (key: string, value: string) => void,
+    isNewRecord: boolean
+  ) => {
+    const actionType = isNewRecord ? 'CREATE' : 'UPDATE';
+    const config = getFieldConfig(field.name, actionType);
+
+    // Skip hidden fields
+    if (config && !config.visible) return null;
+
+    const label = config?.label || field.name;
+    const placeholder = config?.placeholder || '';
+    const helpText = config?.help_text || '';
+    const isReadOnly = config?.read_only ?? false;
+    const widthClass = config?.width ? `width-${config.width}` : 'width-full';
+
+    // Apply default value for new records
+    const fieldValue = formData[field.name] || (isNewRecord && config?.default_value) || '';
+
+    return (
+      <div class={`form-group ${widthClass}`}>
+        <label>{label}{field.required ? ' *' : ''}</label>
+        {renderFieldInputWithConfig(field, fieldValue, (v) => setFormData(field.name, v), placeholder, isReadOnly)}
+        <Show when={helpText}>
+          <div class="form-help-text">{helpText}</div>
+        </Show>
+      </div>
+    );
+  };
+
+  // Render field input with placeholder and read-only support
+  const renderFieldInputWithConfig = (
+    field: SchemaField,
+    value: string,
+    onChange: (value: string) => void,
+    placeholder: string = '',
+    readOnly: boolean = false
+  ) => {
+    const fieldType = field.type;
+
+    return (
+      <Switch fallback={
+        <input
+          type="text"
+          value={value}
+          onInput={(e) => onChange(e.currentTarget.value)}
+          placeholder={placeholder}
+          disabled={readOnly}
+        />
+      }>
+        <Match when={fieldType === 'NUMBER'}>
+          <input
+            type="number"
+            value={value}
+            onInput={(e) => onChange(e.currentTarget.value)}
+            placeholder={placeholder}
+            disabled={readOnly}
+          />
+        </Match>
+        <Match when={fieldType === 'BOOL'}>
+          <select
+            value={value === 'true' || value === '1' ? 'true' : 'false'}
+            onChange={(e) => onChange(e.currentTarget.value)}
+            disabled={readOnly}
+          >
+            <option value="false">False</option>
+            <option value="true">True</option>
+          </select>
+        </Match>
+        <Match when={fieldType === 'SELECT'}>
+          <select
+            value={value}
+            onChange={(e) => onChange(e.currentTarget.value)}
+            disabled={readOnly}
+          >
+            <option value="">{placeholder || '-- Select --'}</option>
+            <For each={field.select_options || []}>
+              {(option) => <option value={option}>{option}</option>}
+            </For>
+          </select>
+        </Match>
+        <Match when={fieldType === 'DATE'}>
+          <input
+            type="date"
+            value={value}
+            onInput={(e) => onChange(e.currentTarget.value)}
+            disabled={readOnly}
+          />
+        </Match>
+        <Match when={fieldType === 'EMAIL'}>
+          <input
+            type="email"
+            value={value}
+            onInput={(e) => onChange(e.currentTarget.value)}
+            placeholder={placeholder}
+            disabled={readOnly}
+          />
+        </Match>
+        <Match when={fieldType === 'URL'}>
+          <input
+            type="url"
+            placeholder={placeholder || 'https://...'}
+            value={value}
+            onInput={(e) => onChange(e.currentTarget.value)}
+            disabled={readOnly}
+          />
+        </Match>
+        <Match when={fieldType === 'JSON'}>
+          <textarea
+            placeholder={placeholder || '{"key": "value"}'}
+            value={value}
+            onInput={(e) => onChange(e.currentTarget.value)}
+            rows={3}
+            disabled={readOnly}
+          />
+        </Match>
+      </Switch>
+    );
+  };
+
+  // Get fields sorted by form view order
+  const getSortedFields = (fields: SchemaField[], isNewRecord: boolean): SchemaField[] => {
+    const actionType = isNewRecord ? 'CREATE' : 'UPDATE';
+    const view = getActiveFormView(actionType);
+
+    if (!view) return fields;
+
+    // Sort by form view order
+    return [...fields].sort((a, b) => {
+      const configA = view.fields.find(f => f.name === a.name);
+      const configB = view.fields.find(f => f.name === b.name);
+      const orderA = configA?.order ?? 999;
+      const orderB = configB?.order ?? 999;
+      return orderA - orderB;
+    });
+  };
+
+  // Check if a field should be visible based on form view config
+  const isFieldVisible = (fieldName: string, isNewRecord: boolean): boolean => {
+    const actionType = isNewRecord ? 'CREATE' : 'UPDATE';
+    const config = getFieldConfig(fieldName, actionType);
+    // If no config, field is visible by default
+    return config?.visible ?? true;
+  };
+
   // Render form fields (for add/edit modals)
   const renderFormFields = (
     formData: Record<string, string>,
@@ -526,19 +714,22 @@ export function CollectionView() {
   ) => {
     const sections = getSections();
     const hasTableFields = getTableFields().length > 0;
+    const actionType = isNewRecord ? 'CREATE' : 'UPDATE';
+    const activeView = getActiveFormView(actionType);
 
-    // If no sections, render flat list
+    // If no sections, render flat list with form grid
     if (sections.length === 0) {
+      const allFields = collection()?.fields.filter(f => f.name !== 'id' && f.type !== 'TABLE') || [];
+      const sortedFields = getSortedFields(allFields, isNewRecord);
+      const visibleFields = sortedFields.filter(f => isFieldVisible(f.name, isNewRecord));
+
       return (
         <>
-          <For each={collection()?.fields.filter(f => f.name !== 'id' && f.type !== 'TABLE') || []}>
-            {(field) => (
-              <div class="form-group">
-                <label>{field.name}{field.required ? ' *' : ''}</label>
-                {renderFieldInput(field, formData[field.name] || '', (v) => setFormData(field.name, v))}
-              </div>
-            )}
-          </For>
+          <div class={activeView ? 'form-grid' : ''}>
+            <For each={visibleFields}>
+              {(field) => renderFormFieldWithConfig(field, formData, setFormData, isNewRecord)}
+            </For>
+          </div>
           <Show when={hasTableFields}>
             <For each={getTableFields()}>
               {(field) => renderLineItemsTable(field, isNewRecord)}
@@ -550,23 +741,20 @@ export function CollectionView() {
 
     // Render with sections
     const unsectionedFields = getFieldsForSection(null).filter(f => f.type !== 'TABLE');
+    const sortedUnsectionedFields = getSortedFields(unsectionedFields, isNewRecord);
+    const visibleUnsectionedFields = sortedUnsectionedFields.filter(f => isFieldVisible(f.name, isNewRecord));
 
     return (
       <div class="record-sections">
         {/* Unsectioned fields */}
-        <Show when={unsectionedFields.length > 0}>
+        <Show when={visibleUnsectionedFields.length > 0}>
           <div class="record-section">
             <div class="record-section-header">
               <h4 class="record-section-title">General</h4>
             </div>
-            <div class="record-section-content">
-              <For each={unsectionedFields}>
-                {(field) => (
-                  <div class="form-group">
-                    <label>{field.name}{field.required ? ' *' : ''}</label>
-                    {renderFieldInput(field, formData[field.name] || '', (v) => setFormData(field.name, v))}
-                  </div>
-                )}
+            <div class={`record-section-content ${activeView ? 'form-grid' : ''}`}>
+              <For each={visibleUnsectionedFields}>
+                {(field) => renderFormFieldWithConfig(field, formData, setFormData, isNewRecord)}
               </For>
             </div>
           </div>
@@ -576,24 +764,21 @@ export function CollectionView() {
         <For each={sections}>
           {(section) => {
             const sectionFields = getFieldsForSection(section.id!).filter(f => f.type !== 'TABLE');
+            const sortedSectionFields = getSortedFields(sectionFields, isNewRecord);
+            const visibleSectionFields = sortedSectionFields.filter(f => isFieldVisible(f.name, isNewRecord));
             const isCollapsed = collapsedSections[section.id!];
 
             return (
-              <Show when={sectionFields.length > 0}>
+              <Show when={visibleSectionFields.length > 0}>
                 <div class="record-section">
                   <div class="record-section-header" onClick={() => section.id && toggleSection(section.id)}>
                     <span class="collapse-icon">{isCollapsed ? '>' : 'v'}</span>
                     <h4 class="record-section-title">{section.name}</h4>
                   </div>
                   <Show when={!isCollapsed}>
-                    <div class="record-section-content">
-                      <For each={sectionFields}>
-                        {(field) => (
-                          <div class="form-group">
-                            <label>{field.name}{field.required ? ' *' : ''}</label>
-                            {renderFieldInput(field, formData[field.name] || '', (v) => setFormData(field.name, v))}
-                          </div>
-                        )}
+                    <div class={`record-section-content ${activeView ? 'form-grid' : ''}`}>
+                      <For each={visibleSectionFields}>
+                        {(field) => renderFormFieldWithConfig(field, formData, setFormData, isNewRecord)}
                       </For>
                     </div>
                   </Show>
@@ -618,6 +803,7 @@ export function CollectionView() {
     if (currentName) {
       fetchRecords();
       fetchViews();
+      fetchFormViews();
     }
   });
 
@@ -635,13 +821,27 @@ export function CollectionView() {
             views={views()}
             selectedViewId={selectedViewId()}
             onSelect={handleViewSelect}
-            onManage={() => setShowViewManager(true)}
           />
-          <Show when={collection()}>
-            <A href={`/collection/${name()}/edit`} class="btn">
-              Edit Schema
-            </A>
-          </Show>
+          <div class="dropdown">
+            <button class="btn" onClick={() => setShowOptionsMenu(!showOptionsMenu())}>
+              Options
+            </button>
+            <Show when={showOptionsMenu()}>
+              <div class="dropdown-menu" onClick={() => setShowOptionsMenu(false)}>
+                <button class="dropdown-item" onClick={() => setShowViewManager(true)}>
+                  Manage Table Views
+                </button>
+                <button class="dropdown-item" onClick={() => setShowFormViewManager(true)}>
+                  Manage Form Views
+                </button>
+                <Show when={collection()}>
+                  <A href={`/collection/${name()}/edit`} class="dropdown-item">
+                    Edit Schema
+                  </A>
+                </Show>
+              </div>
+            </Show>
+          </div>
           <button class="btn btn-primary" onClick={() => setShowAddForm(true)}>
             + Add Record
           </button>
@@ -654,8 +854,15 @@ export function CollectionView() {
 
       <Show when={showAddForm()}>
         <div class="modal-overlay" onClick={() => setShowAddForm(false)}>
-          <div class="modal" onClick={(e) => e.stopPropagation()} style="max-width: 640px;">
-            <h3>Add Record</h3>
+          <div class="modal" onClick={(e) => e.stopPropagation()} style="max-width: 720px;">
+            <div class="modal-header-with-selector">
+              <h3>Add Record</h3>
+              <FormViewSelector
+                views={getFormViewsForAction('CREATE')}
+                selectedViewId={selectedCreateViewId()}
+                onSelect={setSelectedCreateViewId}
+              />
+            </div>
             <form onSubmit={handleAddRecord}>
               {renderFormFields(newRecord, (k, v) => setNewRecord(k, v), true)}
               <div class="form-actions">
@@ -673,8 +880,15 @@ export function CollectionView() {
 
       <Show when={editingRecord()}>
         <div class="modal-overlay" onClick={() => setEditingRecord(null)}>
-          <div class="modal" onClick={(e) => e.stopPropagation()} style="max-width: 640px;">
-            <h3>Edit Record (ID: {editingRecord()?.id as number})</h3>
+          <div class="modal" onClick={(e) => e.stopPropagation()} style="max-width: 720px;">
+            <div class="modal-header-with-selector">
+              <h3>Edit Record (ID: {editingRecord()?.id as number})</h3>
+              <FormViewSelector
+                views={getFormViewsForAction('UPDATE')}
+                selectedViewId={selectedUpdateViewId()}
+                onSelect={setSelectedUpdateViewId}
+              />
+            </div>
             <form onSubmit={handleEditRecord}>
               {renderFormFields(editFormData, (k, v) => setEditFormData(k, v), false)}
               <div class="form-actions">
@@ -752,6 +966,19 @@ export function CollectionView() {
           onViewsChanged={() => {
             fetchViews();
             setShowViewManager(false);
+          }}
+        />
+      </Show>
+
+      <Show when={showFormViewManager() && collection()}>
+        <FormViewManager
+          collectionName={name()}
+          schemaFields={collection()!.fields}
+          views={formViews()}
+          onClose={() => setShowFormViewManager(false)}
+          onViewsChanged={() => {
+            fetchFormViews();
+            setShowFormViewManager(false);
           }}
         />
       </Show>

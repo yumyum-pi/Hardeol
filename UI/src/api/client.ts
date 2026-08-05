@@ -60,6 +60,30 @@ export interface TableView {
   is_default: boolean;
 }
 
+export type ActionType = 'CREATE' | 'UPDATE' | 'ALL';
+export type FieldWidth = 'full' | 'half' | 'third';
+
+export interface FormFieldConfig {
+  name: string;
+  order: number;
+  visible: boolean;
+  label?: string;
+  placeholder?: string;
+  help_text?: string;
+  read_only?: boolean;
+  default_value?: string;
+  width: FieldWidth;
+}
+
+export interface FormView {
+  id?: number;
+  name: string;
+  collection_id?: number;
+  action_type: ActionType;
+  fields: FormFieldConfig[];
+  is_default: boolean;
+}
+
 async function request<T>(
   endpoint: string,
   options?: RequestInit
@@ -137,6 +161,27 @@ export const api = {
 
   deleteView: (collectionName: string, viewId: number) =>
     request<string>(`/collection/${collectionName}/views/${viewId}`, {
+      method: 'DELETE',
+    }),
+
+  // Form Views
+  listFormViews: (collectionName: string) =>
+    request<FormView[]>(`/collection/${collectionName}/form-views`),
+
+  createFormView: (collectionName: string, data: Omit<FormView, 'id' | 'collection_id'>) =>
+    request<FormView>(`/collection/${collectionName}/form-views`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateFormView: (collectionName: string, viewId: number, data: Omit<FormView, 'id' | 'collection_id'>) =>
+    request<FormView>(`/collection/${collectionName}/form-views/${viewId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  deleteFormView: (collectionName: string, viewId: number) =>
+    request<string>(`/collection/${collectionName}/form-views/${viewId}`, {
       method: 'DELETE',
     }),
 

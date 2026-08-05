@@ -1,25 +1,25 @@
 import { For, Show } from 'solid-js';
-import { TableView } from '../api/client';
+import { FormView } from '../api/client';
 
-interface ViewSelectorProps {
-  views: TableView[];
+interface FormViewSelectorProps {
+  views: FormView[];
   selectedViewId: number | null;
   onSelect: (viewId: number | null) => void;
   onManage?: () => void;
 }
 
-export function ViewSelector(props: ViewSelectorProps) {
+export function FormViewSelector(props: FormViewSelectorProps) {
   return (
-    <div class="view-selector">
+    <div class="form-view-selector">
       <select
-        class="view-select"
+        class="form-view-select"
         value={props.selectedViewId ?? ''}
         onChange={(e) => {
           const val = e.currentTarget.value;
           props.onSelect(val === '' ? null : Number(val));
         }}
       >
-        <option value="">All Fields</option>
+        <option value="">Default Form</option>
         <For each={props.views}>
           {(view) => (
             <option value={view.id}>
@@ -31,7 +31,7 @@ export function ViewSelector(props: ViewSelectorProps) {
       </select>
       <Show when={props.onManage}>
         <button class="btn btn-sm" onClick={props.onManage}>
-          Manage Views
+          Manage
         </button>
       </Show>
     </div>
