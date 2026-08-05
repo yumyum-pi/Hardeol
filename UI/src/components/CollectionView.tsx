@@ -1,11 +1,13 @@
 import { createSignal, createEffect, For, Show, Switch, Match } from 'solid-js';
 import { createStore, produce } from 'solid-js/store';
 import { useParams, useNavigate, useSearchParams, A } from '@solidjs/router';
-import { api, Collection, SchemaField, TableView, Section, FieldType, FormView, FormFieldConfig } from '../api/client';
+import { api, Collection, SchemaField, TableView, Section, FieldType, FormView, FormFieldConfig, ValidationProfile, ValidationError } from '../api/client';
 import { ViewSelector } from './ViewSelector';
 import { ViewManager } from './ViewManager';
 import { FormViewSelector } from './FormViewSelector';
 import { FormViewManager } from './FormViewManager';
+import { ValidationProfileManager } from './ValidationProfileManager';
+import { validateRecord, getFieldErrors, getCollectionErrors } from '../validation/validator';
 
 interface LineItem {
   id?: number;
@@ -43,6 +45,11 @@ export function CollectionView() {
   // Line items state for TABLE fields
   const [lineItems, setLineItems] = createStore<Record<string, LineItem[]>>({});
   const [newLineItems, setNewLineItems] = createStore<Record<string, LineItem[]>>({});
+
+  // Validation state
+  const [validationProfiles, setValidationProfiles] = createSignal<ValidationProfile[]>([]);
+  const [validationErrors, setValidationErrors] = createSignal<ValidationError[]>([]);
+  const [showValidationManager, setShowValidationManager] = createSignal(false);
 
   const fetchRecords = async () => {
     setLoading(true);
@@ -102,6 +109,76 @@ export function CollectionView() {
       if (createDefault?.id) setSelectedCreateViewId(createDefault.id);
       if (updateDefault?.id) setSelectedUpdateViewId(updateDefault.id);
     }
+  };
+
+  const fetchValidationProfiles = async () => {
+    const response = await api.listValidationProfiles(name());
+    if (response.data) {
+      setValidationProfiles(response.data);
+    }
+  };
+
+  // Get active validation profiles for an action type
+  const getActiveValidationProfiles = (actionType: 'CREATE' | 'UPDATE'): ValidationProfile[] => {
+    return validationProfiles().filter(p =>
+      p.is_active && (p.action_type === actionType || p.action_type === 'ALL')
+    );
+  };
+
+  // Validate record data against active profiles
+  const validateFormData = (formData: Record<string, string>, actionType: 'CREATE' | 'UPDATE'): ValidationError[] => {
+    const col = collection();
+    if (!col) return [];
+
+    const profiles = getActiveValidationProfiles(actionType);
+    if (profiles.length === 0) return [];
+
+    // Build fields map
+    const fieldsMap = new Map<string, SchemaField>();
+    col.fields.forEach(f => fieldsMap.set(f.name, f));
+
+    // Convert form data to proper types
+    const data: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(formData)) {
+      const field = fieldsMap.get(key);
+      if (!field) {
+        data[key] = value;
+        continue;
+      }
+      switch (field.type) {
+        case 'NUMBER':
+          data[key] = value === '' ? 0 : Number(value);
+          break;
+        case 'BOOL':
+          data[key] = value === 'true' || value === '1';
+          break;
+        default:
+          data[key] = value;
+      }
+    }
+
+    // Run validation against all active profiles
+    let allErrors: ValidationError[] = [];
+    for (const profile of profiles) {
+      const result = validateRecord(
+        {
+          field_rules: profile.field_rules,
+          section_rules: profile.section_rules,
+          collection_rules: profile.collection_rules,
+        },
+        fieldsMap,
+        data,
+        actionType
+      );
+      allErrors = [...allErrors, ...result.errors];
+    }
+
+    return allErrors;
+  };
+
+  // Get field errors helper
+  const getFieldValidationErrors = (fieldName: string): ValidationError[] => {
+    return getFieldErrors(validationErrors(), fieldName);
   };
 
   // Get active form view for a given action type
@@ -190,6 +267,15 @@ export function CollectionView() {
 
   const handleAddRecord = async (e: Event) => {
     e.preventDefault();
+
+    // Client-side validation first
+    const errors = validateFormData(newRecord, 'CREATE');
+    if (errors.length > 0) {
+      setValidationErrors(errors);
+      return;
+    }
+    setValidationErrors([]);
+
     const data: Record<string, unknown> = {};
 
     for (const [key, value] of Object.entries(newRecord)) {
@@ -265,6 +351,14 @@ export function CollectionView() {
     e.preventDefault();
     const record = editingRecord();
     if (!record) return;
+
+    // Client-side validation first
+    const errors = validateFormData(editFormData, 'UPDATE');
+    if (errors.length > 0) {
+      setValidationErrors(errors);
+      return;
+    }
+    setValidationErrors([]);
 
     const data: Record<string, unknown> = {};
 
@@ -580,12 +674,21 @@ export function CollectionView() {
     // Apply default value for new records
     const fieldValue = formData[field.name] || (isNewRecord && config?.default_value) || '';
 
+    // Get field validation errors
+    const fieldErrors = getFieldValidationErrors(field.name);
+    const hasError = fieldErrors.length > 0;
+
     return (
-      <div class={`form-group ${widthClass}`}>
+      <div class={`form-group ${widthClass} ${hasError ? 'has-error' : ''}`}>
         <label>{label}{field.required ? ' *' : ''}</label>
         {renderFieldInputWithConfig(field, fieldValue, (v) => setFormData(field.name, v), placeholder, isReadOnly)}
-        <Show when={helpText}>
+        <Show when={helpText && !hasError}>
           <div class="form-help-text">{helpText}</div>
+        </Show>
+        <Show when={hasError}>
+          <For each={fieldErrors}>
+            {(err) => <div class="field-error">{err.message}</div>}
+          </For>
         </Show>
       </div>
     );
@@ -804,6 +907,7 @@ export function CollectionView() {
       fetchRecords();
       fetchViews();
       fetchFormViews();
+      fetchValidationProfiles();
     }
   });
 
@@ -833,6 +937,9 @@ export function CollectionView() {
                 </button>
                 <button class="dropdown-item" onClick={() => setShowFormViewManager(true)}>
                   Manage Form Views
+                </button>
+                <button class="dropdown-item" onClick={() => setShowValidationManager(true)}>
+                  Manage Validation
                 </button>
                 <Show when={collection()}>
                   <A href={`/collection/${name()}/edit`} class="dropdown-item">
@@ -864,9 +971,19 @@ export function CollectionView() {
               />
             </div>
             <form onSubmit={handleAddRecord}>
+              <Show when={validationErrors().length > 0 && getCollectionErrors(validationErrors()).length > 0}>
+                <div class="validation-error-banner">
+                  <h4>Validation Errors</h4>
+                  <ul class="validation-error-list">
+                    <For each={getCollectionErrors(validationErrors())}>
+                      {(err) => <li>{err.message}</li>}
+                    </For>
+                  </ul>
+                </div>
+              </Show>
               {renderFormFields(newRecord, (k, v) => setNewRecord(k, v), true)}
               <div class="form-actions">
-                <button type="button" class="btn" onClick={() => setShowAddForm(false)}>
+                <button type="button" class="btn" onClick={() => { setShowAddForm(false); setValidationErrors([]); }}>
                   Cancel
                 </button>
                 <button type="submit" class="btn btn-primary">
@@ -879,7 +996,7 @@ export function CollectionView() {
       </Show>
 
       <Show when={editingRecord()}>
-        <div class="modal-overlay" onClick={() => setEditingRecord(null)}>
+        <div class="modal-overlay" onClick={() => { setEditingRecord(null); setValidationErrors([]); }}>
           <div class="modal" onClick={(e) => e.stopPropagation()} style="max-width: 720px;">
             <div class="modal-header-with-selector">
               <h3>Edit Record (ID: {editingRecord()?.id as number})</h3>
@@ -890,9 +1007,19 @@ export function CollectionView() {
               />
             </div>
             <form onSubmit={handleEditRecord}>
+              <Show when={validationErrors().length > 0 && getCollectionErrors(validationErrors()).length > 0}>
+                <div class="validation-error-banner">
+                  <h4>Validation Errors</h4>
+                  <ul class="validation-error-list">
+                    <For each={getCollectionErrors(validationErrors())}>
+                      {(err) => <li>{err.message}</li>}
+                    </For>
+                  </ul>
+                </div>
+              </Show>
               {renderFormFields(editFormData, (k, v) => setEditFormData(k, v), false)}
               <div class="form-actions">
-                <button type="button" class="btn" onClick={() => setEditingRecord(null)}>
+                <button type="button" class="btn" onClick={() => { setEditingRecord(null); setValidationErrors([]); }}>
                   Cancel
                 </button>
                 <button type="submit" class="btn btn-primary">
@@ -979,6 +1106,20 @@ export function CollectionView() {
           onViewsChanged={() => {
             fetchFormViews();
             setShowFormViewManager(false);
+          }}
+        />
+      </Show>
+
+      <Show when={showValidationManager() && collection()}>
+        <ValidationProfileManager
+          collectionName={name()}
+          schemaFields={collection()!.fields}
+          sections={collection()!.sections || []}
+          profiles={validationProfiles()}
+          onClose={() => setShowValidationManager(false)}
+          onProfilesChanged={() => {
+            fetchValidationProfiles();
+            setShowValidationManager(false);
           }}
         />
       </Show>

@@ -3,6 +3,7 @@ module yumyum-pi/Hardeol
 go 1.22
 
 require (
+	github.com/expr-lang/expr v1.16.9
 	gorm.io/driver/sqlite v1.5.7
 	gorm.io/gorm v1.25.12
 )

@@ -84,6 +84,85 @@ export interface FormView {
   is_default: boolean;
 }
 
+// Validation Types
+export interface FieldRule {
+  field_name: string;
+  min_length?: number;
+  max_length?: number;
+  regex?: string;
+  min?: number;
+  max?: number;
+  integer_only?: boolean;
+  min_date?: string;
+  max_date?: string;
+  min_rows?: number;
+  max_rows?: number;
+  json_schema?: string;
+  custom_expr?: string;
+  error_message?: string;
+}
+
+export interface ConditionalRule {
+  if_field: string;
+  if_condition: 'filled' | 'empty' | 'equals' | 'not_equals';
+  if_value?: string;
+  then_field: string;
+  then_condition: 'required' | 'filled' | 'empty';
+  error_message?: string;
+}
+
+export interface SectionRule {
+  section_id: number;
+  min_fields_filled?: number;
+  max_fields_filled?: number;
+  conditions?: ConditionalRule[];
+  custom_expr?: string;
+  error_message?: string;
+}
+
+export interface CrossSectionCondition {
+  if_section_id: number;
+  if_field: string;
+  if_condition: string;
+  if_value?: string;
+  then_section_id: number;
+  then_field: string;
+  then_condition: string;
+  error_message?: string;
+}
+
+export interface CollectionRule {
+  rule_type: 'uniqueness' | 'cross_section' | 'custom';
+  unique_fields?: string[];
+  cross_section_conditions?: CrossSectionCondition[];
+  custom_expr?: string;
+  error_message?: string;
+}
+
+export interface ValidationProfile {
+  id?: number;
+  name: string;
+  collection_id?: number;
+  action_type: ActionType;
+  is_active: boolean;
+  field_rules: FieldRule[];
+  section_rules: SectionRule[];
+  collection_rules: CollectionRule[];
+}
+
+export interface ValidationError {
+  field?: string;
+  section_id?: number | null;
+  rule_type: 'field' | 'section' | 'collection';
+  message: string;
+  code: string;
+}
+
+export interface ValidationResult {
+  valid: boolean;
+  errors: ValidationError[];
+}
+
 async function request<T>(
   endpoint: string,
   options?: RequestInit
@@ -204,5 +283,32 @@ export const api = {
   deleteLineItem: (collectionName: string, recordId: number | string, fieldName: string, rowId: number | string) =>
     request<string>(`/collection/${collectionName}/${recordId}/${fieldName}/${rowId}`, {
       method: 'DELETE',
+    }),
+
+  // Validation Profiles
+  listValidationProfiles: (collectionName: string) =>
+    request<ValidationProfile[]>(`/collection/${collectionName}/validation-profiles`),
+
+  createValidationProfile: (collectionName: string, data: Omit<ValidationProfile, 'id' | 'collection_id'>) =>
+    request<ValidationProfile>(`/collection/${collectionName}/validation-profiles`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateValidationProfile: (collectionName: string, profileId: number, data: Omit<ValidationProfile, 'id' | 'collection_id'>) =>
+    request<ValidationProfile>(`/collection/${collectionName}/validation-profiles/${profileId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  deleteValidationProfile: (collectionName: string, profileId: number) =>
+    request<string>(`/collection/${collectionName}/validation-profiles/${profileId}`, {
+      method: 'DELETE',
+    }),
+
+  validateRecord: (collectionName: string, data: Record<string, unknown>, action: 'CREATE' | 'UPDATE', profileId?: number) =>
+    request<ValidationResult>(`/collection/${collectionName}/validate`, {
+      method: 'POST',
+      body: JSON.stringify({ data, action, profile_id: profileId }),
     }),
 };
