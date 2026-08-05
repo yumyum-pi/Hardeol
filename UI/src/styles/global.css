@@ -377,7 +377,7 @@ body {
 
 /* Forms */
 .schema-form {
-  max-width: 640px;
+  max-width: 800px;
 }
 
 .form-section {
@@ -749,4 +749,291 @@ input:disabled {
 .btn-xs {
   padding: 0.25rem 0.5rem;
   font-size: 0.75rem;
+}
+
+/* Section Management */
+.section-container {
+  border: 1px solid var(--color-primary);
+  border-left: 3px solid var(--color-primary);
+}
+
+.section-header-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 1rem;
+}
+
+.section-drag-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.section-title-row {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.section-name-input-inline {
+  flex: 1;
+  padding: 0.375rem 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+}
+
+.section-name-input-inline:hover {
+  border-color: var(--color-border);
+}
+
+.section-name-input-inline:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  background: var(--color-bg);
+}
+
+.section-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.section-fields {
+  padding-left: 0.5rem;
+}
+
+.add-section-container {
+  margin: 1rem 0;
+  text-align: center;
+}
+
+.btn-outline {
+  background: transparent;
+  border: 1px dashed var(--color-border);
+  color: var(--color-text-muted);
+}
+
+.btn-outline:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: rgba(99, 102, 241, 0.1);
+}
+
+.empty-fields-hint {
+  text-align: center;
+  padding: 1rem;
+}
+
+/* Field Sections */
+.collapse-icon {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  width: 1rem;
+  flex-shrink: 0;
+}
+
+.field-count {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+/* TABLE Field Editor */
+.table-field-editor {
+  margin-top: 0.75rem;
+  margin-left: 1.5rem;
+  padding: 1rem;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+}
+
+.table-field-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.table-field-header h4 {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.table-fields-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.table-field-row {
+  background: var(--color-bg-secondary);
+  padding: 0.5rem;
+  border-radius: var(--radius-sm);
+}
+
+.table-field-row .field-inputs {
+  flex-wrap: wrap;
+}
+
+.table-field-row .field-name-input {
+  min-width: 100px;
+}
+
+.table-field-row .field-type-select {
+  width: 100px;
+}
+
+/* Line Items Table in CollectionView */
+.line-items-section {
+  margin-top: 1.5rem;
+}
+
+.line-items-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.line-items-header h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.line-items-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.line-items-table th,
+.line-items-table td {
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.line-items-table th {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  background: var(--color-bg-tertiary);
+}
+
+.line-items-table tr:last-child td {
+  border-bottom: none;
+}
+
+.line-items-table input,
+.line-items-table select {
+  width: 100%;
+  padding: 0.375rem 0.5rem;
+  font-size: 0.8125rem;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+}
+
+.line-items-table input:focus,
+.line-items-table select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.line-item-actions {
+  width: 60px;
+  text-align: center;
+}
+
+.add-line-item-row {
+  text-align: center;
+  padding: 0.5rem;
+}
+
+/* Sections in CollectionView */
+.record-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.record-section {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.record-section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: var(--color-bg-tertiary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.record-section-header:hover {
+  background: var(--color-bg);
+}
+
+.record-section-title {
+  flex: 1;
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.record-section-content {
+  padding: 1rem;
+}
+
+/* Toggle Label */
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  padding: 0.375rem 0.5rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  transition: all 0.15s;
+}
+
+.toggle-label:hover {
+  border-color: var(--color-primary);
+  color: var(--color-text);
+}
+
+.toggle-label input {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--color-primary);
+}
+
+.toggle-text {
+  font-weight: 500;
 }

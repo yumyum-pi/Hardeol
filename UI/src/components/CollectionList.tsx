@@ -1,11 +1,10 @@
 import { onMount, For, Accessor } from 'solid-js';
-import type { Collection } from '../App';
+import { A } from '@solidjs/router';
+import type { Collection } from '../api/client';
 
 interface CollectionListProps {
   collections: Accessor<Collection[]>;
   onRefresh: () => Promise<void>;
-  onSelect: (name: string) => void;
-  onNewCollection: () => void;
 }
 
 export function CollectionList(props: CollectionListProps) {
@@ -17,22 +16,22 @@ export function CollectionList(props: CollectionListProps) {
     <div class="collection-list">
       <header class="page-header">
         <h2>Collections</h2>
-        <button class="btn btn-primary" onClick={props.onNewCollection}>
+        <A href="/new" class="btn btn-primary">
           + New Collection
-        </button>
+        </A>
       </header>
 
       <div class="card-grid">
         <For each={props.collections()} fallback={
           <div class="empty-state">
             <p>No collections yet</p>
-            <button class="btn btn-primary" onClick={props.onNewCollection}>
+            <A href="/new" class="btn btn-primary">
               Create your first collection
-            </button>
+            </A>
           </div>
         }>
           {(collection) => (
-            <div class="card" onClick={() => props.onSelect(collection.name)}>
+            <A href={`/collection/${collection.name}`} class="card">
               <div class="card-header">
                 <h3>{collection.name}</h3>
               </div>
@@ -54,7 +53,7 @@ export function CollectionList(props: CollectionListProps) {
                   </For>
                 </ul>
               </div>
-            </div>
+            </A>
           )}
         </For>
       </div>

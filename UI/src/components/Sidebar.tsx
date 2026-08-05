@@ -1,14 +1,15 @@
 import { onMount, For } from 'solid-js';
-import type { Collection, View } from '../App';
+import { A, useLocation } from '@solidjs/router';
+import type { Collection } from '../App';
 
 interface SidebarProps {
   collections: Collection[];
-  currentView: View;
-  onNavigate: (view: View) => void;
   onRefresh: () => Promise<void>;
 }
 
 export function Sidebar(props: SidebarProps) {
+  const location = useLocation();
+
   onMount(() => {
     props.onRefresh();
   });
@@ -16,7 +17,9 @@ export function Sidebar(props: SidebarProps) {
   return (
     <aside class="sidebar">
       <div class="sidebar-header">
-        <h1 class="logo">Hardeol</h1>
+        <A href="/" class="logo-link">
+          <h1 class="logo">Hardeol</h1>
+        </A>
         <span class="version">v0.1.0</span>
       </div>
 
@@ -24,34 +27,27 @@ export function Sidebar(props: SidebarProps) {
         <div class="nav-section">
           <div class="nav-section-header">
             <span>Collections</span>
-            <button
-              class="btn-icon"
-              onClick={() => props.onNavigate({ type: 'new-collection' })}
-              title="New Collection"
-            >
+            <A href="/new" class="btn-icon" title="New Collection">
               +
-            </button>
+            </A>
           </div>
 
           <ul class="nav-list">
             <For each={props.collections} fallback={<li class="nav-empty">No collections</li>}>
               {(collection) => (
                 <li>
-                  <button
+                  <A
+                    href={`/collection/${collection.name}`}
                     class="nav-item"
                     classList={{
-                      active:
-                        props.currentView.type === 'collection' &&
-                        (props.currentView as { name: string }).name === collection.name,
+                      active: location.pathname === `/collection/${collection.name}` ||
+                              location.pathname.startsWith(`/collection/${collection.name}/`),
                     }}
-                    onClick={() =>
-                      props.onNavigate({ type: 'collection', name: collection.name })
-                    }
                   >
                     <span class="nav-icon">&#9776;</span>
                     <span class="nav-label">{collection.name}</span>
                     <span class="nav-badge">{collection.fields.length - 1}</span>
-                  </button>
+                  </A>
                 </li>
               )}
             </For>

@@ -21,10 +21,11 @@ func Init(r *router.DynamicRouter) {
 	database.Migrate(&SchemaField{})
 	database.Migrate(&Collection{})
 	database.Migrate(&TableView{})
+	database.Migrate(&Section{})
 
 	db := database.Get()
 	c = make([]Collection, 0)
-	res := db.Preload("Fields").Find(&c)
+	res := db.Preload("Fields").Preload("Sections").Find(&c)
 	if res.Error != nil {
 		logger.Error.Println(res.Error.Error())
 	}
@@ -62,9 +63,27 @@ func newCollection(cc Collection, db *gorm.DB, r *router.DynamicRouter) {
 		return
 	}
 
+	// Initialize child tables for TABLE fields
+	for _, field := range cc.GetTableFields() {
+		childTableName := cc.GetChildTableName(field.Name)
+		if err := createChildTable(db, childTableName, field); err != nil {
+			logger.Error.Println("failed to create child table:", err)
+		}
+	}
+
 	// Register CRUD routes
 	handlers := CRUDRouter(&cc)
 	for _, h := range handlers {
+		r.Handle(
+			h.method,
+			h.path,
+			h.handler,
+		)
+	}
+
+	// Register child table CRUD routes for TABLE fields
+	childHandlers := ChildTableRouter(&cc)
+	for _, h := range childHandlers {
 		r.Handle(
 			h.method,
 			h.path,
@@ -90,9 +109,27 @@ func newCollectionRoutes(cc Collection, db *gorm.DB, r *router.DynamicRouter) er
 		return err
 	}
 
+	// Initialize child tables for TABLE fields
+	for _, field := range cc.GetTableFields() {
+		childTableName := cc.GetChildTableName(field.Name)
+		if err := createChildTable(db, childTableName, field); err != nil {
+			return err
+		}
+	}
+
 	// Register CRUD routes
 	handlers := CRUDRouter(&cc)
 	for _, h := range handlers {
+		r.Handle(
+			h.method,
+			h.path,
+			h.handler,
+		)
+	}
+
+	// Register child table CRUD routes for TABLE fields
+	childHandlers := ChildTableRouter(&cc)
+	for _, h := range childHandlers {
 		r.Handle(
 			h.method,
 			h.path,
@@ -123,6 +160,15 @@ func UpdateCollectionRoutes(cc Collection, db *gorm.DB, r *router.DynamicRouter)
 	r.Remove(router.MethodPUT, basePath+"/:id")
 	r.Remove(router.MethodDELETE, basePath+"/:id")
 
+	// Remove old child table routes
+	for _, field := range cc.GetTableFields() {
+		childPath := fmt.Sprintf("%s/:id/%s", basePath, field.Name)
+		r.Remove(router.MethodGET, childPath)
+		r.Remove(router.MethodPOST, childPath)
+		r.Remove(router.MethodPUT, childPath+"/:row_id")
+		r.Remove(router.MethodDELETE, childPath+"/:row_id")
+	}
+
 	// Re-register with updated schema
 	handlers := CRUDRouter(&cc)
 	for _, h := range handlers {
@@ -130,6 +176,15 @@ func UpdateCollectionRoutes(cc Collection, db *gorm.DB, r *router.DynamicRouter)
 			return err
 		}
 	}
+
+	// Re-register child table routes
+	childHandlers := ChildTableRouter(&cc)
+	for _, h := range childHandlers {
+		if err := r.Handle(h.method, h.path, h.handler); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -283,4 +338,153 @@ func CRUDRouter(c *Collection) []crudRouterReturnType {
 	})
 
 	return asdf
+}
+
+// ChildTableRouter creates CRUD routes for TABLE field child tables
+func ChildTableRouter(c *Collection) []crudRouterReturnType {
+	routes := make([]crudRouterReturnType, 0)
+
+	for _, field := range c.GetTableFields() {
+		fieldName := field.Name
+		childTableName := c.GetChildTableName(fieldName)
+		tableField := field // capture for closures
+
+		// Create dynamic type for child table
+		childType, err := CreateTableFieldType(tableField)
+		if err != nil {
+			logger.Error.Println("failed to create child type:", err)
+			continue
+		}
+
+		// GET /collection/{name}/:id/{field_name} - List child rows
+		handleList := func(ctx *router.Ctx) {
+			parentID := ctx.GetParam("id")
+			if parentID == "" {
+				ctx.ResponseError(http.StatusBadRequest, "parent id required")
+				return
+			}
+
+			sliceType := reflect.SliceOf(childType)
+			sliceValue := reflect.MakeSlice(sliceType, 0, 0)
+			valSlice := sliceValue.Interface()
+
+			db := database.Get()
+			res := db.Table(childTableName).Where("parent_id = ?", parentID).Order("row_order ASC").Find(&valSlice)
+			if res.Error != nil {
+				ctx.ResponseError(http.StatusInternalServerError, res.Error.Error())
+				return
+			}
+			ctx.ResponseOk(http.StatusOK, valSlice)
+		}
+
+		// POST /collection/{name}/:id/{field_name} - Create child row
+		handleCreate := func(ctx *router.Ctx) {
+			parentID := ctx.GetParam("id")
+			if parentID == "" {
+				ctx.ResponseError(http.StatusBadRequest, "parent id required")
+				return
+			}
+
+			v := reflect.New(childType).Interface()
+			if err := json.NewDecoder(ctx.Request.Body).Decode(v); err != nil {
+				ctx.ResponseError(http.StatusBadRequest, "Invalid JSON: "+err.Error())
+				return
+			}
+
+			// Set parent_id
+			rv := reflect.ValueOf(v).Elem()
+			parentIDField := rv.FieldByName("ParentId")
+			if parentIDField.IsValid() && parentIDField.CanSet() {
+				pid := 0
+				fmt.Sscanf(parentID, "%d", &pid)
+				parentIDField.SetInt(int64(pid))
+			}
+
+			// Get max row_order and set new order
+			db := database.Get()
+			var maxOrder int
+			db.Table(childTableName).Where("parent_id = ?", parentID).Select("COALESCE(MAX(row_order), -1)").Scan(&maxOrder)
+			rowOrderField := rv.FieldByName("RowOrder")
+			if rowOrderField.IsValid() && rowOrderField.CanSet() {
+				rowOrderField.SetInt(int64(maxOrder + 1))
+			}
+
+			res := db.Table(childTableName).Create(v)
+			if res.Error != nil {
+				ctx.ResponseError(http.StatusInternalServerError, res.Error.Error())
+				return
+			}
+			ctx.ResponseOk(http.StatusCreated, v)
+		}
+
+		// PUT /collection/{name}/:id/{field_name}/:row_id - Update child row
+		handleUpdate := func(ctx *router.Ctx) {
+			parentID := ctx.GetParam("id")
+			rowID := ctx.GetParam("row_id")
+			if parentID == "" || rowID == "" {
+				ctx.ResponseError(http.StatusBadRequest, "parent id and row id required")
+				return
+			}
+
+			var updates map[string]interface{}
+			if err := json.NewDecoder(ctx.Request.Body).Decode(&updates); err != nil {
+				ctx.ResponseError(http.StatusBadRequest, "Invalid JSON: "+err.Error())
+				return
+			}
+
+			delete(updates, "id")
+			delete(updates, "parent_id")
+
+			db := database.Get()
+			res := db.Table(childTableName).Where("id = ? AND parent_id = ?", rowID, parentID).Updates(updates)
+			if res.Error != nil {
+				ctx.ResponseError(http.StatusInternalServerError, res.Error.Error())
+				return
+			}
+			if res.RowsAffected == 0 {
+				ctx.ResponseError(http.StatusNotFound, "Row not found")
+				return
+			}
+
+			v := reflect.New(childType).Interface()
+			if err := db.Table(childTableName).Where("id = ?", rowID).First(v).Error; err != nil {
+				ctx.ResponseError(http.StatusInternalServerError, err.Error())
+				return
+			}
+			ctx.ResponseOk(http.StatusOK, v)
+		}
+
+		// DELETE /collection/{name}/:id/{field_name}/:row_id - Delete child row
+		handleDelete := func(ctx *router.Ctx) {
+			parentID := ctx.GetParam("id")
+			rowID := ctx.GetParam("row_id")
+			if parentID == "" || rowID == "" {
+				ctx.ResponseError(http.StatusBadRequest, "parent id and row id required")
+				return
+			}
+
+			db := database.Get()
+			res := db.Table(childTableName).Where("id = ? AND parent_id = ?", rowID, parentID).Delete(nil)
+			if res.Error != nil {
+				ctx.ResponseError(http.StatusInternalServerError, res.Error.Error())
+				return
+			}
+			if res.RowsAffected == 0 {
+				ctx.ResponseError(http.StatusNotFound, "Row not found")
+				return
+			}
+			ctx.ResponseOk(http.StatusOK, rowID)
+		}
+
+		basePath := fmt.Sprintf("/%s/%s/:id/%s", CollectionString, c.Name, fieldName)
+
+		routes = append(routes,
+			crudRouterReturnType{router.MethodGET, basePath, handleList},
+			crudRouterReturnType{router.MethodPOST, basePath, handleCreate},
+			crudRouterReturnType{router.MethodPUT, basePath + "/:row_id", handleUpdate},
+			crudRouterReturnType{router.MethodDELETE, basePath + "/:row_id", handleDelete},
+		)
+	}
+
+	return routes
 }

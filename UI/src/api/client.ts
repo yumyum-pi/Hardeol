@@ -6,28 +6,44 @@ export interface ApiResponse<T> {
   error?: string;
 }
 
+export type FieldType = 'TEXT' | 'NUMBER' | 'BOOL' | 'EMAIL' | 'URL' | 'DATE' | 'SELECT' | 'JSON' | 'TABLE';
+
 export interface SchemaField {
   id?: number;
   name: string;
-  type: 'TEXT' | 'NUMBER' | 'BOOL' | 'EMAIL' | 'URL' | 'DATE' | 'SELECT' | 'JSON';
+  type: FieldType;
   required: boolean;
   select_options?: string[]; // For SELECT type
   collection_id?: number;
+  section_id?: number | null; // Reference to section (from DB)
+  section_index?: number | null; // Section index for creating/updating (frontend use)
+  order?: number; // Field ordering within section
+  table_fields?: SchemaField[]; // Nested fields for TABLE type
+}
+
+export interface Section {
+  id?: number;
+  collection_id?: number;
+  name: string;
+  order: number;
 }
 
 export interface Collection {
   id: number;
   name: string;
   fields: SchemaField[];
+  sections?: Section[];
 }
 
 export interface CreateCollectionRequest {
   name: string;
   fields: Omit<SchemaField, 'id' | 'collection_id'>[];
+  sections?: Omit<Section, 'id' | 'collection_id'>[];
 }
 
 export interface UpdateCollectionRequest {
   fields: Omit<SchemaField, 'id' | 'collection_id'>[];
+  sections?: Omit<Section, 'id' | 'collection_id'>[];
 }
 
 export interface ViewField {
@@ -121,6 +137,27 @@ export const api = {
 
   deleteView: (collectionName: string, viewId: number) =>
     request<string>(`/collection/${collectionName}/views/${viewId}`, {
+      method: 'DELETE',
+    }),
+
+  // Line Items (TABLE field child rows)
+  listLineItems: (collectionName: string, recordId: number | string, fieldName: string) =>
+    request<Record<string, unknown>[]>(`/collection/${collectionName}/${recordId}/${fieldName}`),
+
+  createLineItem: (collectionName: string, recordId: number | string, fieldName: string, data: Record<string, unknown>) =>
+    request<Record<string, unknown>>(`/collection/${collectionName}/${recordId}/${fieldName}`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateLineItem: (collectionName: string, recordId: number | string, fieldName: string, rowId: number | string, data: Record<string, unknown>) =>
+    request<Record<string, unknown>>(`/collection/${collectionName}/${recordId}/${fieldName}/${rowId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  deleteLineItem: (collectionName: string, recordId: number | string, fieldName: string, rowId: number | string) =>
+    request<string>(`/collection/${collectionName}/${recordId}/${fieldName}/${rowId}`, {
       method: 'DELETE',
     }),
 };

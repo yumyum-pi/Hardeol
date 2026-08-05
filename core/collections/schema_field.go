@@ -47,17 +47,53 @@ const (
 	FieldDate   SchemaFieldType = "DATE"
 	FieldSelect SchemaFieldType = "SELECT"
 	FieldJSON   SchemaFieldType = "JSON"
+	FieldTable  SchemaFieldType = "TABLE"
 )
+
+// SchemaFieldList is a custom type for storing nested SchemaFields as JSON in SQLite
+type SchemaFieldList []SchemaField
+
+// Value implements driver.Valuer for database serialization
+func (s SchemaFieldList) Value() (driver.Value, error) {
+	if s == nil {
+		return "[]", nil
+	}
+	data, err := json.Marshal(s)
+	if err != nil {
+		return nil, err
+	}
+	return string(data), nil
+}
+
+// Scan implements sql.Scanner for database deserialization
+func (s *SchemaFieldList) Scan(value interface{}) error {
+	if value == nil {
+		*s = nil
+		return nil
+	}
+	var data []byte
+	switch v := value.(type) {
+	case []byte:
+		data = v
+	case string:
+		data = []byte(v)
+	}
+	return json.Unmarshal(data, s)
+}
 
 // SchemaField represents a single field in the dynamic schema.
 type SchemaField struct {
 	Name          string          `json:"name"`
 	Type          SchemaFieldType `json:"type"`
-	Regex         string          `json:"regex,omitempty"`          // optional regex validation
+	Regex         string          `json:"regex,omitempty"`                           // optional regex validation
 	Required      bool            `json:"required"`
-	SelectOptions StringSlice      `json:"select_options,omitempty" gorm:"type:TEXT"` // For SELECT type
+	SelectOptions StringSlice     `json:"select_options,omitempty" gorm:"type:TEXT"` // For SELECT type
 	ID            int             `json:"id" gorm:"autoIncrement"`
-	CollectionID  int             `json:"collection_id"` // foreign key to the Collection
+	CollectionID  int             `json:"collection_id"`                             // foreign key to the Collection
+	SectionID     *int            `json:"section_id,omitempty"`                      // nullable reference to section
+	SectionIndex  *int            `json:"section_index,omitempty" gorm:"-"`          // section index from frontend (not stored in DB)
+	Order         int             `json:"order"`                                     // field ordering within section
+	TableFields   SchemaFieldList `json:"table_fields,omitempty" gorm:"type:TEXT"`  // nested fields for TABLE type
 }
 
 func NewSchemaField(name, fieldType string, required bool, regex string) *SchemaField {

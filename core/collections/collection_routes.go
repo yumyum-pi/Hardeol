@@ -22,7 +22,7 @@ func collectionsHandleList(ctx *router.Ctx) {
 	list := make([]Collection, 0)
 
 	db := database.Get()
-	res := db.Preload("Fields").Find(&list)
+	res := db.Preload("Fields").Preload("Sections").Find(&list)
 	if res.Error != nil {
 		ctx.ResponseError(http.StatusInternalServerError, res.Error.Error())
 		return
@@ -46,11 +46,25 @@ func collectionsHandleCreate(ctx *router.Ctx) {
 		return
 	}
 
-	// validate field names
+	// validate field names and TABLE field nested fields
 	for _, field := range col.Fields {
 		if !IsValidFieldName(field.Name) {
 			ctx.ResponseError(http.StatusBadRequest, "Invalid field name '"+field.Name+"': must start with letter, contain only letters, numbers, and underscores")
 			return
+		}
+		// Validate nested TABLE fields
+		if field.Type == FieldTable {
+			for _, tableField := range field.TableFields {
+				if !IsValidFieldName(tableField.Name) {
+					ctx.ResponseError(http.StatusBadRequest, "Invalid table field name '"+tableField.Name+"': must start with letter, contain only letters, numbers, and underscores")
+					return
+				}
+				// TABLE fields cannot be nested
+				if tableField.Type == FieldTable {
+					ctx.ResponseError(http.StatusBadRequest, "TABLE fields cannot be nested within TABLE fields")
+					return
+				}
+			}
 		}
 	}
 
@@ -76,29 +90,67 @@ func collectionsHandleCreate(ctx *router.Ctx) {
 	}
 
 	db := database.Get()
-	res := db.Create(col)
+
+	// Create collection first (without fields and sections)
+	colToCreate := Collection{
+		Name: col.Name,
+	}
+	res := db.Create(&colToCreate)
 	if res.Error != nil {
-		// rollback the name reservation on failure
 		CollectionNameDelete(col.Name)
 		ctx.ResponseError(http.StatusInternalServerError, res.Error.Error())
 		return
 	}
 
-	rb := router.Get()
-	err := newCollectionRoutes(*col, db, rb)
-	if err != nil {
-		// rollback on failure
+	// Create sections and build index-to-ID mapping
+	sectionIndexToID := make(map[int]int)
+	for i, section := range col.Sections {
+		section.CollectionID = colToCreate.ID
+		section.Order = i
+		if err := db.Create(&section).Error; err != nil {
+			CollectionNameDelete(col.Name)
+			ctx.ResponseError(http.StatusInternalServerError, err.Error())
+			return
+		}
+		sectionIndexToID[i] = section.ID
+	}
+
+	// Map section_index to section_id for fields and create them
+	for i := range col.Fields {
+		col.Fields[i].CollectionID = colToCreate.ID
+		if col.Fields[i].SectionIndex != nil {
+			if sectionID, ok := sectionIndexToID[*col.Fields[i].SectionIndex]; ok {
+				col.Fields[i].SectionID = &sectionID
+			}
+		}
+		col.Fields[i].SectionIndex = nil // Clear the transient field
+	}
+
+	if err := db.Create(&col.Fields).Error; err != nil {
 		CollectionNameDelete(col.Name)
 		ctx.ResponseError(http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	ctx.ResponseOk(http.StatusCreated, col)
+	// Reload the full collection
+	var fullCol Collection
+	db.Preload("Fields").Preload("Sections").First(&fullCol, colToCreate.ID)
+
+	rb := router.Get()
+	err := newCollectionRoutes(fullCol, db, rb)
+	if err != nil {
+		CollectionNameDelete(col.Name)
+		ctx.ResponseError(http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	ctx.ResponseOk(http.StatusCreated, fullCol)
 }
 
 // UpdateCollectionRequest represents the request body for updating a collection
 type UpdateCollectionRequest struct {
-	Fields []SchemaField `json:"fields"`
+	Fields   []SchemaField `json:"fields"`
+	Sections []Section     `json:"sections"`
 }
 
 func collectionsHandleUpdate(ctx *router.Ctx) {
@@ -116,19 +168,33 @@ func collectionsHandleUpdate(ctx *router.Ctx) {
 		return
 	}
 
-	// Validate field names
+	// Validate field names and TABLE field nested fields
 	for _, field := range req.Fields {
 		if !IsValidFieldName(field.Name) {
 			ctx.ResponseError(http.StatusBadRequest, "Invalid field name '"+field.Name+"': must start with letter, contain only letters, numbers, and underscores")
 			return
 		}
+		// Validate nested TABLE fields
+		if field.Type == FieldTable {
+			for _, tableField := range field.TableFields {
+				if !IsValidFieldName(tableField.Name) {
+					ctx.ResponseError(http.StatusBadRequest, "Invalid table field name '"+tableField.Name+"': must start with letter, contain only letters, numbers, and underscores")
+					return
+				}
+				// TABLE fields cannot be nested
+				if tableField.Type == FieldTable {
+					ctx.ResponseError(http.StatusBadRequest, "TABLE fields cannot be nested within TABLE fields")
+					return
+				}
+			}
+		}
 	}
 
 	db := database.Get()
 
-	// Fetch existing collection with fields
+	// Fetch existing collection with fields and sections
 	var col Collection
-	res := db.Preload("Fields").Where("name = ?", name).First(&col)
+	res := db.Preload("Fields").Preload("Sections").Where("name = ?", name).First(&col)
 	if res.Error != nil {
 		ctx.ResponseError(http.StatusNotFound, "collection not found")
 		return
@@ -147,20 +213,40 @@ func collectionsHandleUpdate(ctx *router.Ctx) {
 		req.Fields = append(req.Fields, id)
 	}
 
-	// Compute schema diff
+	// Compute schema diff (excluding TABLE fields from diff since they're in separate tables)
 	diff := ComputeSchemaDiff(col.Fields, req.Fields)
-
-	// If no changes, return early
-	if diff.IsEmpty() {
-		ctx.ResponseOk(http.StatusOK, col)
-		return
-	}
 
 	// Execute migration in transaction
 	err := db.Transaction(func(tx *gorm.DB) error {
-		// Migrate the underlying data table
-		if err := MigrateCollectionSchema(tx, col.Name, col.Fields, req.Fields, diff); err != nil {
+		// Migrate the underlying data table (handles non-TABLE fields)
+		if !diff.IsEmpty() {
+			if err := MigrateCollectionSchema(tx, col.Name, col.Fields, req.Fields, diff); err != nil {
+				return err
+			}
+		}
+
+		// Handle TABLE field child tables
+		if err := migrateTableFields(tx, col, req.Fields); err != nil {
 			return err
+		}
+
+		// Delete old sections
+		if err := tx.Where("collection_id = ?", col.ID).Delete(&Section{}).Error; err != nil {
+			return err
+		}
+
+		// Create new sections and build index-to-ID mapping
+		sectionIndexToID := make(map[int]int)
+		if len(req.Sections) > 0 {
+			for i := range req.Sections {
+				req.Sections[i].CollectionID = col.ID
+				req.Sections[i].ID = 0 // Reset ID to let DB auto-generate
+				req.Sections[i].Order = i
+				if err := tx.Create(&req.Sections[i]).Error; err != nil {
+					return err
+				}
+				sectionIndexToID[i] = req.Sections[i].ID
+			}
 		}
 
 		// Delete old schema fields
@@ -168,10 +254,16 @@ func collectionsHandleUpdate(ctx *router.Ctx) {
 			return err
 		}
 
-		// Insert new schema fields
+		// Map section_index to section_id for fields and create them
 		for i := range req.Fields {
 			req.Fields[i].CollectionID = col.ID
 			req.Fields[i].ID = 0 // Reset ID to let DB auto-generate
+			if req.Fields[i].SectionIndex != nil {
+				if sectionID, ok := sectionIndexToID[*req.Fields[i].SectionIndex]; ok {
+					req.Fields[i].SectionID = &sectionID
+				}
+			}
+			req.Fields[i].SectionIndex = nil // Clear the transient field
 		}
 		if err := tx.Create(&req.Fields).Error; err != nil {
 			return err
@@ -185,8 +277,8 @@ func collectionsHandleUpdate(ctx *router.Ctx) {
 		return
 	}
 
-	// Reload collection with updated fields
-	res = db.Preload("Fields").First(&col, col.ID)
+	// Reload collection with updated fields and sections
+	res = db.Preload("Fields").Preload("Sections").First(&col, col.ID)
 	if res.Error != nil {
 		ctx.ResponseError(http.StatusInternalServerError, res.Error.Error())
 		return
@@ -200,4 +292,144 @@ func collectionsHandleUpdate(ctx *router.Ctx) {
 	}
 
 	ctx.ResponseOk(http.StatusOK, col)
+}
+
+// migrateTableFields handles creating/updating/deleting child tables for TABLE fields
+func migrateTableFields(db *gorm.DB, col Collection, newFields []SchemaField) error {
+	// Get existing TABLE fields
+	oldTableFields := make(map[string]SchemaField)
+	for _, field := range col.Fields {
+		if field.Type == FieldTable {
+			oldTableFields[field.Name] = field
+		}
+	}
+
+	// Get new TABLE fields
+	newTableFields := make(map[string]SchemaField)
+	for _, field := range newFields {
+		if field.Type == FieldTable {
+			newTableFields[field.Name] = field
+		}
+	}
+
+	// Create new TABLE field child tables
+	for name, field := range newTableFields {
+		childTableName := col.GetChildTableName(name)
+		if _, exists := oldTableFields[name]; !exists {
+			// New TABLE field - create child table
+			if err := createChildTable(db, childTableName, field); err != nil {
+				return err
+			}
+		} else {
+			// Existing TABLE field - migrate child table if needed
+			if err := migrateChildTable(db, childTableName, oldTableFields[name], field); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Drop child tables for removed TABLE fields
+	for name := range oldTableFields {
+		if _, exists := newTableFields[name]; !exists {
+			childTableName := col.GetChildTableName(name)
+			if err := db.Exec("DROP TABLE IF EXISTS " + childTableName).Error; err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// createChildTable creates a child table for a TABLE field
+func createChildTable(db *gorm.DB, tableName string, field SchemaField) error {
+	columns := []string{
+		"id INTEGER PRIMARY KEY AUTOINCREMENT",
+		"parent_id INTEGER NOT NULL",
+		"row_order INTEGER DEFAULT 0",
+	}
+
+	for _, f := range field.TableFields {
+		sqlType := fieldTypeToSQLType(f.Type)
+		colDef := "\"" + f.Name + "\" " + sqlType
+		if f.Required {
+			colDef += " NOT NULL"
+		}
+		columns = append(columns, colDef)
+	}
+
+	createSQL := "CREATE TABLE IF NOT EXISTS \"" + tableName + "\" (" +
+		joinStrings(columns, ", ") + ")"
+	return db.Exec(createSQL).Error
+}
+
+// migrateChildTable handles schema changes for child tables
+func migrateChildTable(db *gorm.DB, tableName string, oldField, newField SchemaField) error {
+	// Compute diff for nested fields
+	diff := ComputeSchemaDiff(oldField.TableFields, newField.TableFields)
+	if diff.IsEmpty() {
+		return nil
+	}
+
+	if diff.RequiresTableRecreation() {
+		// Need to recreate table
+		tempTable := tableName + "_temp"
+
+		// Create temp table with new schema
+		if err := createChildTable(db, tempTable, newField); err != nil {
+			return err
+		}
+
+		// Find preserved columns
+		preservedColumns := []string{"id", "parent_id", "row_order"}
+		oldNames := make(map[string]bool)
+		for _, f := range oldField.TableFields {
+			oldNames[f.Name] = true
+		}
+		for _, f := range newField.TableFields {
+			if oldNames[f.Name] {
+				preservedColumns = append(preservedColumns, f.Name)
+			}
+		}
+
+		// Copy data
+		columnList := joinStrings(preservedColumns, ", ")
+		copySQL := "INSERT INTO \"" + tempTable + "\" (" + columnList + ") SELECT " + columnList + " FROM \"" + tableName + "\""
+		if err := db.Exec(copySQL).Error; err != nil {
+			return err
+		}
+
+		// Drop old table
+		if err := db.Exec("DROP TABLE \"" + tableName + "\"").Error; err != nil {
+			return err
+		}
+
+		// Rename temp table
+		renameSQL := "ALTER TABLE \"" + tempTable + "\" RENAME TO \"" + tableName + "\""
+		return db.Exec(renameSQL).Error
+	}
+
+	// Simple case: only additions
+	for _, field := range diff.Added {
+		sqlType := fieldTypeToSQLType(field.Type)
+		defaultVal := fieldDefaultValue(field.Type)
+		sql := "ALTER TABLE \"" + tableName + "\" ADD COLUMN \"" + field.Name + "\" " + sqlType + " DEFAULT " + defaultVal
+		if err := db.Exec(sql).Error; err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// joinStrings joins strings with a separator
+func joinStrings(strs []string, sep string) string {
+	if len(strs) == 0 {
+		return ""
+	}
+	result := strs[0]
+	for i := 1; i < len(strs); i++ {
+		result += sep + strs[i]
+	}
+	return result
 }

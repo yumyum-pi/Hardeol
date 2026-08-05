@@ -32,6 +32,7 @@ func (d SchemaDiff) RequiresTableRecreation() bool {
 }
 
 // ComputeSchemaDiff computes the differences between old and new schema fields
+// TABLE fields are excluded from the diff since they are stored in separate child tables
 func ComputeSchemaDiff(oldFields, newFields []SchemaField) SchemaDiff {
 	diff := SchemaDiff{
 		Added:    make([]SchemaField, 0),
@@ -39,19 +40,27 @@ func ComputeSchemaDiff(oldFields, newFields []SchemaField) SchemaDiff {
 		Modified: make([]SchemaFieldChange, 0),
 	}
 
-	// Create maps for quick lookup
+	// Create maps for quick lookup (excluding TABLE fields)
 	oldMap := make(map[string]SchemaField)
 	for _, f := range oldFields {
-		oldMap[f.Name] = f
+		if f.Type != FieldTable {
+			oldMap[f.Name] = f
+		}
 	}
 
 	newMap := make(map[string]SchemaField)
 	for _, f := range newFields {
-		newMap[f.Name] = f
+		if f.Type != FieldTable {
+			newMap[f.Name] = f
+		}
 	}
 
 	// Find added and modified fields
 	for _, newField := range newFields {
+		// Skip TABLE fields - they are handled separately
+		if newField.Type == FieldTable {
+			continue
+		}
 		if oldField, exists := oldMap[newField.Name]; exists {
 			// Check if field was modified (type or required changed)
 			if oldField.Type != newField.Type || oldField.Required != newField.Required {
@@ -68,6 +77,10 @@ func ComputeSchemaDiff(oldFields, newFields []SchemaField) SchemaDiff {
 
 	// Find removed fields
 	for _, oldField := range oldFields {
+		// Skip TABLE fields
+		if oldField.Type == FieldTable {
+			continue
+		}
 		if _, exists := newMap[oldField.Name]; !exists {
 			diff.Removed = append(diff.Removed, oldField)
 		}
@@ -228,6 +241,8 @@ func fieldTypeToSQLType(fieldType SchemaFieldType) string {
 		return "INTEGER"
 	case FieldBool:
 		return "INTEGER" // SQLite has no BOOL, use 0/1
+	case FieldTable:
+		return "" // TABLE fields don't have a SQL type, they're stored in separate tables
 	default:
 		return "TEXT"
 	}

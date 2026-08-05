@@ -1,150 +1,410 @@
-import { createSignal, For, Show } from 'solid-js';
+import { createSignal, For, Show, onMount } from 'solid-js';
 import { createStore, produce } from 'solid-js/store';
-import { api, Collection } from '../api/client';
-
-type FieldType = 'TEXT' | 'NUMBER' | 'BOOL' | 'EMAIL' | 'URL' | 'DATE' | 'SELECT' | 'JSON';
+import { useParams, useNavigate } from '@solidjs/router';
+import { api, Collection, FieldType } from '../api/client';
 
 interface Field {
   name: string;
   type: FieldType;
   required: boolean;
   select_options?: string[];
-  select_options_text?: string; // Raw input text for editing
+  select_options_text?: string;
+  order?: number;
+  table_fields?: Field[];
 }
 
-interface SchemaBuilderProps {
-  onSave: () => void;
-  onCancel: () => void;
-  collection?: Collection; // If provided, we're in edit mode
+interface SectionState {
+  name: string;
+  collapsed: boolean;
+  fields: Field[];
 }
 
-export function SchemaBuilder(props: SchemaBuilderProps) {
-  const isEditMode = () => !!props.collection;
+export function SchemaBuilder() {
+  const params = useParams();
+  const navigate = useNavigate();
+  const [collection, setCollection] = createSignal<Collection | undefined>(undefined);
+  const isEditMode = () => !!params.name;
 
-  // Initialize from collection if in edit mode
-  const initialFields = (): Field[] => {
-    if (props.collection) {
-      // Filter out the id field - it's auto-managed
-      return props.collection.fields
-        .filter((f) => f.name !== 'id')
-        .map((f) => ({
-          name: f.name,
-          type: f.type,
-          required: f.required,
-          select_options: f.select_options,
-          select_options_text: (f.select_options || []).join(', '),
-        }));
-    }
-    return [{ name: '', type: 'TEXT', required: false }];
-  };
-
-  const [name, setName] = createSignal(props.collection?.name || '');
-  const [fields, setFields] = createStore<Field[]>(initialFields());
+  const [name, setName] = createSignal('');
+  const [unsectionedFields, setUnsectionedFields] = createStore<Field[]>([]);
+  const [sections, setSections] = createStore<SectionState[]>([]);
   const [error, setError] = createSignal<string | null>(null);
   const [saving, setSaving] = createSignal(false);
   const [showRemovalWarning, setShowRemovalWarning] = createSignal(false);
+  const [editingTableField, setEditingTableField] = createSignal<{ sectionIndex: number | null; fieldIndex: number } | null>(null);
 
-  const addField = () => {
-    setFields(produce((f) => f.push({ name: '', type: 'TEXT', required: false })));
+  onMount(async () => {
+    if (params.name) {
+      const response = await api.listCollections();
+      const col = response.data?.find(c => c.name === params.name);
+      if (col) {
+        setCollection(col);
+        setName(col.name);
+
+        // Load sections - sort by order
+        const sortedSections = [...(col.sections || [])].sort((a, b) => a.order - b.order);
+
+        // Create a map from section_id to section_index
+        const sectionIdToIndex = new Map<number, number>();
+        sortedSections.forEach((s, idx) => {
+          if (s.id !== undefined) {
+            sectionIdToIndex.set(s.id, idx);
+          }
+        });
+
+        // Group fields by section
+        const sectionFields: Field[][] = sortedSections.map(() => []);
+        const unsectioned: Field[] = [];
+
+        col.fields
+          .filter((f) => f.name !== 'id')
+          .forEach((f) => {
+            const field: Field = {
+              name: f.name,
+              type: f.type,
+              required: f.required,
+              select_options: f.select_options,
+              select_options_text: (f.select_options || []).join(', '),
+              order: f.order ?? 0,
+              table_fields: f.table_fields?.map(tf => ({
+                name: tf.name,
+                type: tf.type,
+                required: tf.required,
+                select_options: tf.select_options,
+                select_options_text: (tf.select_options || []).join(', '),
+              })) || [],
+            };
+
+            if (f.section_id !== null && f.section_id !== undefined) {
+              const sectionIdx = sectionIdToIndex.get(f.section_id);
+              if (sectionIdx !== undefined) {
+                sectionFields[sectionIdx].push(field);
+              } else {
+                unsectioned.push(field);
+              }
+            } else {
+              unsectioned.push(field);
+            }
+          });
+
+        // Set sections with their fields
+        setSections(sortedSections.map((s, idx) => ({
+          name: s.name,
+          collapsed: false,
+          fields: sectionFields[idx],
+        })));
+
+        setUnsectionedFields(unsectioned);
+      }
+    } else {
+      // New collection - start with one empty field
+      setUnsectionedFields([{ name: '', type: 'TEXT', required: false }]);
+    }
+  });
+
+  const nameTransformer = (input: string): string => {
+    if (input.length === 0) return "";
+    const diff = 97 - 65;
+    let newString = "";
+    for (let i = 0; i < input.length; i++) {
+      const char = input[i];
+      if (char === ' ') {
+        newString += '_';
+      } else if (char >= 'a' && char <= 'z') {
+        newString += char;
+      } else if (char >= 'A' && char <= 'Z') {
+        newString += String.fromCharCode(char.charCodeAt(0) + diff);
+      } else if (char === '_') {
+        newString += '_';
+      } else if (char >= '0' && char <= '9' && i > 0) {
+        newString += char;
+      }
+    }
+    return newString;
   };
 
-  const removeField = (index: number) => {
-    // In edit mode, show warning about data loss if removing an existing field
-    if (isEditMode() && props.collection) {
-      const fieldName = fields[index].name;
-      const existingField = props.collection.fields.find((f) => f.name === fieldName);
+  // Section management
+  const addSection = () => {
+    setSections(produce((s) => s.push({
+      name: `Section ${s.length + 1}`,
+      collapsed: false,
+      fields: [{ name: '', type: 'TEXT', required: false }]
+    })));
+  };
+
+  const updateSectionName = (index: number, name: string) => {
+    setSections(index, 'name', name);
+  };
+
+  const removeSection = (index: number) => {
+    // Move fields from this section to unsectioned
+    const sectionFields = sections[index].fields;
+    setUnsectionedFields(produce((f) => f.push(...sectionFields)));
+    setSections(produce((s) => s.splice(index, 1)));
+  };
+
+  const toggleSection = (index: number) => {
+    setSections(index, 'collapsed', !sections[index].collapsed);
+  };
+
+  const moveSectionUp = (index: number) => {
+    if (index === 0) return;
+    setSections(produce((s) => {
+      const temp = s[index];
+      s[index] = s[index - 1];
+      s[index - 1] = temp;
+    }));
+  };
+
+  const moveSectionDown = (index: number) => {
+    if (index >= sections.length - 1) return;
+    setSections(produce((s) => {
+      const temp = s[index];
+      s[index] = s[index + 1];
+      s[index + 1] = temp;
+    }));
+  };
+
+  const convertSectionToTable = (sectionIndex: number) => {
+    const section = sections[sectionIndex];
+
+    // Validation: Section must have at least 1 field with a name
+    const validFields = section.fields.filter(f => f.name.trim());
+    if (validFields.length === 0) {
+      setError('Section must have at least one named field to convert to a table');
+      return;
+    }
+
+    // Validation: No field in the section can be of type TABLE (tables can't nest)
+    const hasNestedTable = validFields.some(f => f.type === 'TABLE');
+    if (hasNestedTable) {
+      setError('Cannot convert section containing TABLE fields (tables cannot be nested)');
+      return;
+    }
+
+    // Create TABLE field from section
+    const tableField: Field = {
+      name: nameTransformer(section.name),
+      type: 'TABLE',
+      required: false,
+      table_fields: validFields.map(f => ({
+        name: f.name,
+        type: f.type,
+        required: f.required,
+        select_options: f.select_options,
+        select_options_text: f.select_options_text,
+      })),
+    };
+
+    // Calculate the new field index before adding
+    const newFieldIndex = unsectionedFields.length;
+
+    // Add to unsectioned fields
+    setUnsectionedFields(produce(f => f.push(tableField)));
+
+    // Remove the section
+    setSections(produce(s => s.splice(sectionIndex, 1)));
+
+    // Auto-expand the table field editor to show the converted columns
+    setEditingTableField({ sectionIndex: null, fieldIndex: newFieldIndex });
+  };
+
+  // Field management for unsectioned fields
+  const addUnsectionedField = () => {
+    setUnsectionedFields(produce((f) => f.push({ name: '', type: 'TEXT', required: false })));
+  };
+
+  const removeUnsectionedField = (index: number) => {
+    if (isEditMode() && collection()) {
+      const fieldName = unsectionedFields[index].name;
+      const existingField = collection()!.fields.find((f) => f.name === fieldName);
       if (existingField) {
         setShowRemovalWarning(true);
       }
     }
-    setFields(produce((f) => f.splice(index, 1)));
+    setUnsectionedFields(produce((f) => f.splice(index, 1)));
   };
 
- const nameTransformer = (input:string):string => { 
-	if (input.length == 0) {
-		return "";
-	}
+  const updateUnsectionedField = (index: number, key: keyof Field, value: unknown) => {
+    setUnsectionedFields(index, key, value as never);
+  };
 
-const diff = 97-65;
+  // Field management for section fields
+  const addSectionField = (sectionIndex: number) => {
+    setSections(sectionIndex, 'fields', produce((f) => f.push({ name: '', type: 'TEXT', required: false })));
+  };
 
-	let newString = ""	
-	let char = ""
+  const removeSectionField = (sectionIndex: number, fieldIndex: number) => {
+    if (isEditMode() && collection()) {
+      const fieldName = sections[sectionIndex].fields[fieldIndex].name;
+      const existingField = collection()!.fields.find((f) => f.name === fieldName);
+      if (existingField) {
+        setShowRemovalWarning(true);
+      }
+    }
+    setSections(sectionIndex, 'fields', produce((f) => f.splice(fieldIndex, 1)));
+  };
 
-	for (let i = 0; i < input.length; i++) {
-		char = input[i];
-		switch(true) {
-			// check if char is space
-			case char == ' ' : {
-				newString += '_';
-				break;
-			}
+  const updateSectionField = (sectionIndex: number, fieldIndex: number, key: keyof Field, value: unknown) => {
+    setSections(sectionIndex, 'fields', fieldIndex, key, value as never);
+  };
 
-			// check if char is small case
-			case char >= 'a' && char <='z': {
-				newString +=char;
-				break;
-			}
-			case char >= 'A' && char <='Z': {
-				newString += String.fromCharCode(char.charCodeAt(0) + diff);
-				break;
-			}
-			case char == '_' : {
-				newString += '_';
-				break;
-			}
-			
-			default: { break; }
+  // TABLE field nested fields management
+  const addTableField = (sectionIndex: number | null, fieldIndex: number) => {
+    if (sectionIndex === null) {
+      setUnsectionedFields(produce((f) => {
+        if (!f[fieldIndex].table_fields) {
+          f[fieldIndex].table_fields = [];
+        }
+        f[fieldIndex].table_fields!.push({ name: '', type: 'TEXT', required: false });
+      }));
+    } else {
+      setSections(sectionIndex, 'fields', produce((f) => {
+        if (!f[fieldIndex].table_fields) {
+          f[fieldIndex].table_fields = [];
+        }
+        f[fieldIndex].table_fields!.push({ name: '', type: 'TEXT', required: false });
+      }));
+    }
+  };
 
-		}
-	}
-return newString;
- }
+  const removeTableField = (sectionIndex: number | null, fieldIndex: number, tableFieldIndex: number) => {
+    if (sectionIndex === null) {
+      setUnsectionedFields(produce((f) => {
+        f[fieldIndex].table_fields?.splice(tableFieldIndex, 1);
+      }));
+    } else {
+      setSections(sectionIndex, 'fields', produce((f) => {
+        f[fieldIndex].table_fields?.splice(tableFieldIndex, 1);
+      }));
+    }
+  };
 
-  const updateField = (index: number, key: keyof Field, value: string | boolean) => {
-    setFields(index, key, value as never);
+  const updateTableField = (sectionIndex: number | null, fieldIndex: number, tableFieldIndex: number, key: keyof Field, value: unknown) => {
+    if (sectionIndex === null) {
+      setUnsectionedFields(produce((f) => {
+        if (f[fieldIndex].table_fields && f[fieldIndex].table_fields![tableFieldIndex]) {
+          (f[fieldIndex].table_fields![tableFieldIndex] as any)[key] = value;
+        }
+      }));
+    } else {
+      setSections(sectionIndex, 'fields', produce((f) => {
+        if (f[fieldIndex].table_fields && f[fieldIndex].table_fields![tableFieldIndex]) {
+          (f[fieldIndex].table_fields![tableFieldIndex] as any)[key] = value;
+        }
+      }));
+    }
+  };
+
+  const isEditingTableField = (sectionIndex: number | null, fieldIndex: number) => {
+    const editing = editingTableField();
+    return editing && editing.sectionIndex === sectionIndex && editing.fieldIndex === fieldIndex;
+  };
+
+  const toggleTableFieldEditor = (sectionIndex: number | null, fieldIndex: number) => {
+    if (isEditingTableField(sectionIndex, fieldIndex)) {
+      setEditingTableField(null);
+    } else {
+      setEditingTableField({ sectionIndex, fieldIndex });
+    }
   };
 
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
     setError(null);
 
-    // Validation
     if (!name().trim()) {
       setError('Collection name is required');
       return;
     }
 
-    const validFields = fields.filter((f) => f.name.trim());
-    if (validFields.length === 0) {
+    // Collect all valid fields
+    const allFields: { field: Field; sectionIndex: number | null }[] = [];
+
+    // Unsectioned fields
+    unsectionedFields.filter(f => f.name.trim()).forEach(f => {
+      allFields.push({ field: f, sectionIndex: null });
+    });
+
+    // Section fields
+    sections.forEach((section, sectionIndex) => {
+      section.fields.filter(f => f.name.trim()).forEach(f => {
+        allFields.push({ field: f, sectionIndex });
+      });
+    });
+
+    if (allFields.length === 0) {
       setError('At least one field is required');
       return;
     }
 
+    // Validate TABLE fields have nested fields
+    for (const { field } of allFields) {
+      if (field.type === 'TABLE') {
+        if (!field.table_fields || field.table_fields.filter(tf => tf.name.trim()).length === 0) {
+          setError(`TABLE field "${field.name}" must have at least one column defined`);
+          return;
+        }
+      }
+    }
+
     setSaving(true);
 
-    const fieldData = validFields.map((f) => {
-      // Parse select_options from text if available
-      let selectOptions = f.select_options;
-      if (f.type === 'SELECT' && f.select_options_text) {
-        selectOptions = f.select_options_text.split(',').map(s => s.trim()).filter(Boolean);
+    // Build field data
+    const fieldData = allFields.map(({ field, sectionIndex }, idx) => {
+      let selectOptions = field.select_options;
+      if (field.type === 'SELECT' && field.select_options_text) {
+        selectOptions = field.select_options_text.split(',').map(s => s.trim()).filter(Boolean);
       }
-      return {
-        name: f.name.trim(),
-        type: f.type,
-        required: f.required,
-        ...(f.type === 'SELECT' && selectOptions && selectOptions.length > 0 ? { select_options: selectOptions } : {}),
+
+      const fieldObj: any = {
+        name: field.name.trim(),
+        type: field.type,
+        required: field.required,
+        section_index: sectionIndex,
+        order: idx,
       };
+
+      if (field.type === 'SELECT' && selectOptions && selectOptions.length > 0) {
+        fieldObj.select_options = selectOptions;
+      }
+
+      if (field.type === 'TABLE' && field.table_fields) {
+        fieldObj.table_fields = field.table_fields
+          .filter(tf => tf.name.trim())
+          .map(tf => {
+            let tfSelectOptions = tf.select_options;
+            if (tf.type === 'SELECT' && tf.select_options_text) {
+              tfSelectOptions = tf.select_options_text.split(',').map(s => s.trim()).filter(Boolean);
+            }
+            return {
+              name: tf.name.trim(),
+              type: tf.type,
+              required: tf.required,
+              ...(tf.type === 'SELECT' && tfSelectOptions && tfSelectOptions.length > 0 ? { select_options: tfSelectOptions } : {}),
+            };
+          });
+      }
+
+      return fieldObj;
     });
+
+    const sectionData = sections.map((s, idx) => ({
+      name: s.name,
+      order: idx,
+    }));
 
     let response;
     if (isEditMode()) {
       response = await api.updateCollection(name().trim(), {
         fields: fieldData,
+        sections: sectionData,
       });
     } else {
       response = await api.createCollection({
         name: name().trim(),
         fields: fieldData,
+        sections: sectionData,
       });
     }
 
@@ -153,18 +413,149 @@ return newString;
     if (response.error) {
       setError(response.error);
     } else {
-      props.onSave();
+      navigate(isEditMode() ? `/collection/${name()}` : '/');
     }
+  };
+
+  const handleCancel = () => {
+    navigate(isEditMode() ? `/collection/${params.name}` : '/');
+  };
+
+  // Render a single field row
+  const renderFieldRow = (
+    field: Field,
+    fieldIndex: number,
+    sectionIndex: number | null,
+    onUpdate: (key: keyof Field, value: unknown) => void,
+    onRemove: () => void,
+    canRemove: boolean,
+    isTableField: boolean = false
+  ) => {
+    const fieldTypes: FieldType[] = isTableField
+      ? ['TEXT', 'NUMBER', 'BOOL', 'EMAIL', 'URL', 'DATE', 'SELECT', 'JSON']
+      : ['TEXT', 'NUMBER', 'BOOL', 'EMAIL', 'URL', 'DATE', 'SELECT', 'JSON', 'TABLE'];
+
+    return (
+      <div class={`field-row ${isTableField ? 'table-field-row' : ''}`}>
+        <div class="field-inputs">
+          <input
+            type="text"
+            placeholder="Field name"
+            value={field.name}
+            onInput={(e) => onUpdate('name', nameTransformer(e.currentTarget.value))}
+            class="field-name-input"
+          />
+          <select
+            value={field.type}
+            onChange={(e) => {
+              const newType = e.currentTarget.value as FieldType;
+              onUpdate('type', newType);
+              if (newType === 'TABLE' && (!field.table_fields || field.table_fields.length === 0)) {
+                onUpdate('table_fields', [{ name: '', type: 'TEXT', required: false }]);
+              }
+            }}
+            class="field-type-select"
+          >
+            <For each={fieldTypes}>
+              {(type) => <option value={type}>{type}</option>}
+            </For>
+          </select>
+
+          <Show when={field.type === 'SELECT'}>
+            <input
+              type="text"
+              placeholder="Options (comma-separated)"
+              value={field.select_options_text ?? ''}
+              onInput={(e) => onUpdate('select_options_text', e.currentTarget.value)}
+              onBlur={(e) => {
+                const options = e.currentTarget.value.split(',').map(s => s.trim()).filter(Boolean);
+                onUpdate('select_options', options);
+              }}
+              class="field-options-input"
+            />
+          </Show>
+
+          <label class="checkbox-label">
+            <input
+              type="checkbox"
+              checked={field.required}
+              onChange={(e) => onUpdate('required', e.currentTarget.checked)}
+            />
+            Required
+          </label>
+        </div>
+
+        <Show when={!isTableField && field.type === 'TABLE'}>
+          <button
+            type="button"
+            class="btn btn-sm"
+            onClick={() => toggleTableFieldEditor(sectionIndex, fieldIndex)}
+          >
+            {isEditingTableField(sectionIndex, fieldIndex) ? 'Hide Columns' : 'Edit Columns'}
+          </button>
+        </Show>
+
+        <button
+          type="button"
+          class="btn btn-icon btn-danger"
+          onClick={onRemove}
+          disabled={!canRemove}
+          title="Remove field"
+        >
+          &times;
+        </button>
+      </div>
+    );
+  };
+
+  // Render TABLE field column editor
+  const renderTableFieldEditor = (field: Field, sectionIndex: number | null, fieldIndex: number) => {
+    if (!field || field.type !== 'TABLE') return null;
+
+    return (
+      <div class="table-field-editor">
+        <div class="table-field-header">
+          <h4>Columns for "{field.name || 'Unnamed Table'}"</h4>
+          <button type="button" class="btn btn-sm" onClick={() => addTableField(sectionIndex, fieldIndex)}>
+            + Add Column
+          </button>
+        </div>
+        <div class="table-fields-list">
+          <For each={field.table_fields || []}>
+            {(tableField, idx) => renderFieldRow(
+              tableField,
+              idx(),
+              sectionIndex,
+              (key, value) => updateTableField(sectionIndex, fieldIndex, idx(), key, value),
+              () => removeTableField(sectionIndex, fieldIndex, idx()),
+              (field.table_fields?.length || 0) > 1,
+              true
+            )}
+          </For>
+        </div>
+        <Show when={!field.table_fields || field.table_fields.length === 0}>
+          <p class="form-hint">No columns defined. Add at least one column.</p>
+        </Show>
+      </div>
+    );
+  };
+
+  const getTotalFieldCount = () => {
+    let count = unsectionedFields.filter(f => f.name.trim()).length;
+    sections.forEach(s => {
+      count += s.fields.filter(f => f.name.trim()).length;
+    });
+    return count;
   };
 
   return (
     <div class="schema-builder">
       <header class="page-header">
         <div class="header-left">
-          <button class="btn btn-text" onClick={props.onCancel}>
+          <button class="btn btn-text" onClick={handleCancel}>
             &larr; Cancel
           </button>
-          <h2>{isEditMode() ? `Edit Collection: ${props.collection?.name}` : 'New Collection'}</h2>
+          <h2>{isEditMode() ? `Edit Collection: ${params.name}` : 'New Collection'}</h2>
         </div>
       </header>
 
@@ -188,7 +579,7 @@ return newString;
               type="text"
               placeholder="e.g., users, posts, products"
               value={name()}
-              onInput={(e) => setName(e.currentTarget.value)}
+              onInput={(e) => setName(nameTransformer(e.currentTarget.value))}
               pattern="^[a-zA-Z][a-zA-Z0-9_]*$"
               title="Must start with letter, alphanumeric and underscore only"
               disabled={isEditMode()}
@@ -201,107 +592,130 @@ return newString;
           </div>
         </div>
 
+        {/* Unsectioned Fields */}
         <div class="form-section">
           <div class="section-header">
             <h3>Fields</h3>
-            <button type="button" class="btn btn-sm" onClick={addField}>
+            <button type="button" class="btn btn-sm" onClick={addUnsectionedField}>
               + Add Field
             </button>
           </div>
 
           <div class="fields-list">
-            <For each={fields}>
+            <For each={unsectionedFields}>
               {(field, index) => (
-                <div class="field-row">
-                  <div class="field-inputs">
-                    <input
-                      type="text"
-                      placeholder="Field name"
-                      value={field.name}
-                      onInput={(e) =>{
-
-			const n = nameTransformer(e.currentTarget.value)
-                        updateField(index(), 'name', n)
-}
-                      }
-                      class="field-name-input"
-                    />
-                    <select
-                      value={field.type}
-                      onChange={(e) =>
-                        updateField(index(), 'type', e.currentTarget.value as FieldType)
-                      }
-                      class="field-type-select"
-                    >
-                      <option value="TEXT">TEXT</option>
-                      <option value="NUMBER">NUMBER</option>
-                      <option value="BOOL">BOOL</option>
-                      <option value="EMAIL">EMAIL</option>
-                      <option value="URL">URL</option>
-                      <option value="DATE">DATE</option>
-                      <option value="SELECT">SELECT</option>
-                      <option value="JSON">JSON</option>
-                    </select>
-
-                    <Show when={field.type === 'SELECT'}>
-                      <input
-                        type="text"
-                        placeholder="Options (comma-separated)"
-                        value={field.select_options_text ?? ''}
-                        onInput={(e) => {
-                          updateField(index(), 'select_options_text', e.currentTarget.value);
-                        }}
-                        onBlur={(e) => {
-                          const options = e.currentTarget.value.split(',').map(s => s.trim()).filter(Boolean);
-                          updateField(index(), 'select_options', options as unknown as string);
-                        }}
-                        class="field-options-input"
-                      />
-                    </Show>
-
-                    <label class="checkbox-label">
-                      <input
-                        type="checkbox"
-                        checked={field.required}
-                        onChange={(e) =>
-                          updateField(index(), 'required', e.currentTarget.checked)
-                        }
-                      />
-                      Required
-                    </label>
-                  </div>
-
-                  <button
-                    type="button"
-                    class="btn btn-icon btn-danger"
-                    onClick={() => removeField(index())}
-                    disabled={fields.length === 1}
-                    title="Remove field"
-                  >
-                    &times;
-                  </button>
-                </div>
+                <>
+                  {renderFieldRow(
+                    field,
+                    index(),
+                    null,
+                    (key, value) => updateUnsectionedField(index(), key, value),
+                    () => removeUnsectionedField(index()),
+                    unsectionedFields.length > 1 || sections.length > 0 || getTotalFieldCount() > 1
+                  )}
+                  <Show when={isEditingTableField(null, index()) && field.type === 'TABLE'}>
+                    {renderTableFieldEditor(field, null, index())}
+                  </Show>
+                </>
               )}
             </For>
           </div>
 
-          <p class="form-hint">
-            An <code>id</code> field will be added automatically.
-          </p>
+          <Show when={unsectionedFields.length === 0 && sections.length === 0}>
+            <p class="form-hint empty-fields-hint">No fields defined. Add a field to get started.</p>
+          </Show>
         </div>
 
+        {/* Sections with Fields */}
+        <For each={sections}>
+          {(section, sectionIndex) => (
+            <div class="form-section section-container">
+              <div class="section-header-row">
+                <div class="section-drag-controls">
+                  <button type="button" class="btn btn-icon btn-sm" onClick={() => moveSectionUp(sectionIndex())} disabled={sectionIndex() === 0} title="Move up">
+                    &#8593;
+                  </button>
+                  <button type="button" class="btn btn-icon btn-sm" onClick={() => moveSectionDown(sectionIndex())} disabled={sectionIndex() >= sections.length - 1} title="Move down">
+                    &#8595;
+                  </button>
+                </div>
+                <div class="section-title-row" onClick={() => toggleSection(sectionIndex())}>
+                  <span class="collapse-icon">{section.collapsed ? '▶' : '▼'}</span>
+                  <input
+                    type="text"
+                    value={section.name}
+                    onInput={(e) => updateSectionName(sectionIndex(), e.currentTarget.value)}
+                    onClick={(e) => e.stopPropagation()}
+                    class="section-name-input-inline"
+                    placeholder="Section name"
+                  />
+                  <span class="field-count">({section.fields.length} fields)</span>
+                </div>
+                <div class="section-actions">
+                  <label class="toggle-label" title="Convert section to a TABLE field">
+                    <input
+                      type="checkbox"
+                      checked={false}
+                      onChange={() => convertSectionToTable(sectionIndex())}
+                    />
+                    <span class="toggle-text">Table</span>
+                  </label>
+                  <button type="button" class="btn btn-sm" onClick={() => addSectionField(sectionIndex())}>
+                    + Add Field
+                  </button>
+                  <button type="button" class="btn btn-icon btn-danger btn-sm" onClick={() => removeSection(sectionIndex())} title="Remove section">
+                    &times;
+                  </button>
+                </div>
+              </div>
+
+              <Show when={!section.collapsed}>
+                <div class="section-fields">
+                  <For each={section.fields}>
+                    {(field, fieldIndex) => (
+                      <>
+                        {renderFieldRow(
+                          field,
+                          fieldIndex(),
+                          sectionIndex(),
+                          (key, value) => updateSectionField(sectionIndex(), fieldIndex(), key, value),
+                          () => removeSectionField(sectionIndex(), fieldIndex()),
+                          section.fields.length > 1 || getTotalFieldCount() > 1
+                        )}
+                        <Show when={isEditingTableField(sectionIndex(), fieldIndex()) && field.type === 'TABLE'}>
+                          {renderTableFieldEditor(field, sectionIndex(), fieldIndex())}
+                        </Show>
+                      </>
+                    )}
+                  </For>
+                  <Show when={section.fields.length === 0}>
+                    <p class="form-hint">No fields in this section.</p>
+                  </Show>
+                </div>
+              </Show>
+            </div>
+          )}
+        </For>
+
+        {/* Add Section Button */}
+        <div class="add-section-container">
+          <button type="button" class="btn btn-outline" onClick={addSection}>
+            + Add Section
+          </button>
+        </div>
+
+        <p class="form-hint">
+          An <code>id</code> field will be added automatically.
+        </p>
+
         <div class="form-actions">
-          <button type="button" class="btn" onClick={props.onCancel}>
+          <button type="button" class="btn" onClick={handleCancel}>
             Cancel
           </button>
           <button type="submit" class="btn btn-primary" disabled={saving()}>
             {saving()
-              ? isEditMode()
-                ? 'Saving...'
-                : 'Creating...'
-              : isEditMode()
-                ? 'Save Changes'
-                : 'Create Collection'}
+              ? isEditMode() ? 'Saving...' : 'Creating...'
+              : isEditMode() ? 'Save Changes' : 'Create Collection'}
           </button>
         </div>
       </form>

@@ -1,9 +1,16 @@
 import { createSignal, createEffect, For, Show, Switch, Match } from 'solid-js';
-import { createStore } from 'solid-js/store';
+import { createStore, produce } from 'solid-js/store';
 import { useParams, useNavigate, useSearchParams, A } from '@solidjs/router';
-import { api, Collection, SchemaField, TableView } from '../api/client';
+import { api, Collection, SchemaField, TableView, Section, FieldType } from '../api/client';
 import { ViewSelector } from './ViewSelector';
 import { ViewManager } from './ViewManager';
+
+interface LineItem {
+  id?: number;
+  parent_id?: number;
+  row_order?: number;
+  [key: string]: unknown;
+}
 
 export function CollectionView() {
   const params = useParams();
@@ -22,6 +29,11 @@ export function CollectionView() {
   const [views, setViews] = createSignal<TableView[]>([]);
   const [selectedViewId, setSelectedViewId] = createSignal<number | null>(null);
   const [showViewManager, setShowViewManager] = createSignal(false);
+  const [collapsedSections, setCollapsedSections] = createStore<Record<number, boolean>>({});
+
+  // Line items state for TABLE fields
+  const [lineItems, setLineItems] = createStore<Record<string, LineItem[]>>({});
+  const [newLineItems, setNewLineItems] = createStore<Record<string, LineItem[]>>({});
 
   const fetchRecords = async () => {
     setLoading(true);
@@ -32,12 +44,12 @@ export function CollectionView() {
     } else {
       const data = response.data || [];
       setRecords(data);
-      // Fetch collection schema to get columns and store collection for editing
       const colResponse = await api.listCollections();
       const col = colResponse.data?.find(c => c.name === name());
       if (col) {
         setCollection(col);
-        setColumns(col.fields.map(f => f.name));
+        // Filter out TABLE fields from columns (they're displayed separately)
+        setColumns(col.fields.filter(f => f.type !== 'TABLE').map(f => f.name));
       } else if (data.length > 0) {
         setColumns(Object.keys(data[0]));
       }
@@ -49,7 +61,6 @@ export function CollectionView() {
     const response = await api.listViews(name());
     if (response.data) {
       setViews(response.data);
-      // If URL has view param, use it; otherwise use default view if exists
       const urlViewId = searchParams.view ? Number(searchParams.view) : null;
       if (urlViewId && response.data.some(v => v.id === urlViewId)) {
         setSelectedViewId(urlViewId);
@@ -72,21 +83,23 @@ export function CollectionView() {
     }
   };
 
-  // Get the currently selected view
   const selectedView = () => views().find(v => v.id === selectedViewId());
 
-  // Get display columns based on selected view or all columns
   const displayColumns = () => {
     const view = selectedView();
     if (view && view.fields.length > 0) {
-      // Sort by order and return field names
       const sortedFields = [...view.fields].sort((a, b) => a.order - b.order);
+      // Filter out TABLE field columns
+      const col = collection();
+      if (col) {
+        const tableFieldNames = col.fields.filter(f => f.type === 'TABLE').map(f => f.name);
+        return sortedFields.filter(f => !tableFieldNames.includes(f.name)).map(f => f.name);
+      }
       return sortedFields.map(f => f.name);
     }
     return columns();
   };
 
-  // Get CSS class for a column from the selected view
   const getColumnCssClass = (columnName: string): string => {
     const view = selectedView();
     if (view) {
@@ -96,11 +109,49 @@ export function CollectionView() {
     return '';
   };
 
+  // Get sections from collection
+  const getSections = (): Section[] => {
+    return collection()?.sections || [];
+  };
+
+  // Get fields for a specific section (null = unsectioned)
+  const getFieldsForSection = (sectionId: number | null): SchemaField[] => {
+    const col = collection();
+    if (!col) return [];
+    return col.fields.filter(f => {
+      if (f.name === 'id') return false;
+      if (sectionId === null) {
+        return f.section_id === null || f.section_id === undefined;
+      }
+      return f.section_id === sectionId;
+    });
+  };
+
+  // Get TABLE fields from collection
+  const getTableFields = (): SchemaField[] => {
+    return collection()?.fields.filter(f => f.type === 'TABLE') || [];
+  };
+
+  // Load line items for a record
+  const loadLineItems = async (recordId: number) => {
+    const tableFields = getTableFields();
+    for (const field of tableFields) {
+      const response = await api.listLineItems(name(), recordId, field.name);
+      if (response.data) {
+        setLineItems(field.name, response.data as LineItem[]);
+      }
+    }
+  };
+
+  // Toggle section collapse
+  const toggleSection = (sectionId: number) => {
+    setCollapsedSections(sectionId, !collapsedSections[sectionId]);
+  };
+
   const handleAddRecord = async (e: Event) => {
     e.preventDefault();
     const data: Record<string, unknown> = {};
 
-    // Convert string values to appropriate types based on field type
     for (const [key, value] of Object.entries(newRecord)) {
       if (key === 'id') continue;
       const field = getField(key);
@@ -114,7 +165,6 @@ export function CollectionView() {
           data[key] = value === 'true' || value === '1';
           break;
         default:
-          // TEXT, EMAIL, URL, DATE, SELECT, JSON - all stored as strings
           data[key] = value;
       }
     }
@@ -123,10 +173,26 @@ export function CollectionView() {
     if (response.error) {
       setError(response.error);
     } else {
+      const newRecordData = response.data;
+      // Create line items for the new record
+      if (newRecordData && newRecordData.id) {
+        const tableFields = getTableFields();
+        for (const field of tableFields) {
+          const items = newLineItems[field.name] || [];
+          for (const item of items) {
+            if (Object.keys(item).some(k => k !== 'id' && k !== 'parent_id' && k !== 'row_order' && item[k])) {
+              await api.createLineItem(name(), newRecordData.id as number, field.name, item);
+            }
+          }
+        }
+      }
       setShowAddForm(false);
-      // Reset all fields
       for (const key of Object.keys(newRecord)) {
         setNewRecord(key, undefined as unknown as string);
+      }
+      // Clear new line items
+      for (const field of getTableFields()) {
+        setNewLineItems(field.name, []);
       }
       await fetchRecords();
     }
@@ -134,7 +200,6 @@ export function CollectionView() {
 
   const handleDelete = async (id: number | string) => {
     if (!confirm('Are you sure you want to delete this record?')) return;
-
     const response = await api.deleteRecord(name(), id);
     if (response.error) {
       setError(response.error);
@@ -143,13 +208,16 @@ export function CollectionView() {
     }
   };
 
-  const openEditForm = (record: Record<string, unknown>) => {
+  const openEditForm = async (record: Record<string, unknown>) => {
     setEditingRecord(record);
-    // Convert all values to strings for the form
     for (const [key, value] of Object.entries(record)) {
       if (key !== 'id') {
         setEditFormData(key, String(value ?? ''));
       }
+    }
+    // Load line items for this record
+    if (record.id) {
+      await loadLineItems(record.id as number);
     }
   };
 
@@ -160,7 +228,6 @@ export function CollectionView() {
 
     const data: Record<string, unknown> = {};
 
-    // Convert string values to appropriate types based on field type
     for (const [key, value] of Object.entries(editFormData)) {
       const field = getField(key);
       const fieldType = field?.type || 'TEXT';
@@ -173,7 +240,6 @@ export function CollectionView() {
           data[key] = value === 'true' || value === '1';
           break;
         default:
-          // TEXT, EMAIL, URL, DATE, SELECT, JSON - all stored as strings
           data[key] = value;
       }
     }
@@ -183,22 +249,372 @@ export function CollectionView() {
       setError(response.error);
     } else {
       setEditingRecord(null);
-      // Reset all fields
       for (const key of Object.keys(editFormData)) {
         setEditFormData(key, undefined as unknown as string);
+      }
+      // Clear line items state
+      for (const field of getTableFields()) {
+        setLineItems(field.name, []);
       }
       await fetchRecords();
     }
   };
 
-  // Get field definition by column name
   const getField = (columnName: string): SchemaField | undefined => {
     return collection()?.fields.find(f => f.name === columnName);
   };
 
-  // Refetch when collection name changes
+  // Line item handlers
+  const addLineItem = (fieldName: string, isNewRecord: boolean = false) => {
+    const field = getField(fieldName);
+    if (!field || !field.table_fields) return;
+
+    const newItem: LineItem = {};
+    for (const tf of field.table_fields) {
+      newItem[tf.name] = tf.type === 'NUMBER' ? 0 : tf.type === 'BOOL' ? false : '';
+    }
+
+    if (isNewRecord) {
+      setNewLineItems(produce(items => {
+        if (!items[fieldName]) items[fieldName] = [];
+        items[fieldName].push(newItem);
+      }));
+    } else {
+      setLineItems(produce(items => {
+        if (!items[fieldName]) items[fieldName] = [];
+        items[fieldName].push(newItem);
+      }));
+    }
+  };
+
+  const updateLineItem = async (fieldName: string, index: number, key: string, value: unknown, isNewRecord: boolean = false) => {
+    if (isNewRecord) {
+      setNewLineItems(fieldName, index, key, value);
+    } else {
+      setLineItems(fieldName, index, key, value);
+
+      // Auto-save existing line items
+      const item = lineItems[fieldName]?.[index];
+      if (item?.id) {
+        const recordId = editingRecord()?.id;
+        if (recordId) {
+          await api.updateLineItem(name(), recordId as number, fieldName, item.id, { [key]: value });
+        }
+      }
+    }
+  };
+
+  const deleteLineItem = async (fieldName: string, index: number, isNewRecord: boolean = false) => {
+    if (isNewRecord) {
+      setNewLineItems(produce(items => {
+        items[fieldName]?.splice(index, 1);
+      }));
+    } else {
+      const item = lineItems[fieldName]?.[index];
+      if (item?.id) {
+        const recordId = editingRecord()?.id;
+        if (recordId) {
+          await api.deleteLineItem(name(), recordId as number, fieldName, item.id);
+        }
+      }
+      setLineItems(produce(items => {
+        items[fieldName]?.splice(index, 1);
+      }));
+    }
+  };
+
+  const saveNewLineItem = async (fieldName: string, index: number) => {
+    const record = editingRecord();
+    if (!record?.id) return;
+
+    const item = lineItems[fieldName]?.[index];
+    if (!item || item.id) return;
+
+    const response = await api.createLineItem(name(), record.id as number, fieldName, item);
+    if (response.data) {
+      setLineItems(fieldName, index, response.data as LineItem);
+    }
+  };
+
+  // Render field input
+  const renderFieldInput = (
+    field: SchemaField,
+    value: string,
+    onChange: (value: string) => void
+  ) => {
+    const fieldType = field.type;
+
+    return (
+      <Switch fallback={
+        <input
+          type="text"
+          value={value}
+          onInput={(e) => onChange(e.currentTarget.value)}
+        />
+      }>
+        <Match when={fieldType === 'NUMBER'}>
+          <input
+            type="number"
+            value={value}
+            onInput={(e) => onChange(e.currentTarget.value)}
+          />
+        </Match>
+        <Match when={fieldType === 'BOOL'}>
+          <select
+            value={value === 'true' || value === '1' ? 'true' : 'false'}
+            onChange={(e) => onChange(e.currentTarget.value)}
+          >
+            <option value="false">False</option>
+            <option value="true">True</option>
+          </select>
+        </Match>
+        <Match when={fieldType === 'SELECT'}>
+          <select
+            value={value}
+            onChange={(e) => onChange(e.currentTarget.value)}
+          >
+            <option value="">-- Select --</option>
+            <For each={field.select_options || []}>
+              {(option) => <option value={option}>{option}</option>}
+            </For>
+          </select>
+        </Match>
+        <Match when={fieldType === 'DATE'}>
+          <input
+            type="date"
+            value={value}
+            onInput={(e) => onChange(e.currentTarget.value)}
+          />
+        </Match>
+        <Match when={fieldType === 'EMAIL'}>
+          <input
+            type="email"
+            value={value}
+            onInput={(e) => onChange(e.currentTarget.value)}
+          />
+        </Match>
+        <Match when={fieldType === 'URL'}>
+          <input
+            type="url"
+            placeholder="https://..."
+            value={value}
+            onInput={(e) => onChange(e.currentTarget.value)}
+          />
+        </Match>
+        <Match when={fieldType === 'JSON'}>
+          <textarea
+            placeholder='{"key": "value"}'
+            value={value}
+            onInput={(e) => onChange(e.currentTarget.value)}
+            rows={3}
+          />
+        </Match>
+      </Switch>
+    );
+  };
+
+  // Render line items table
+  const renderLineItemsTable = (field: SchemaField, isNewRecord: boolean = false) => {
+    if (!field.table_fields || field.table_fields.length === 0) return null;
+
+    const items = isNewRecord ? (newLineItems[field.name] || []) : (lineItems[field.name] || []);
+
+    return (
+      <div class="line-items-section">
+        <div class="line-items-header">
+          <h4>{field.name}</h4>
+          <button type="button" class="btn btn-sm" onClick={() => addLineItem(field.name, isNewRecord)}>
+            + Add Row
+          </button>
+        </div>
+        <table class="line-items-table">
+          <thead>
+            <tr>
+              <For each={field.table_fields}>
+                {(tf) => <th>{tf.name}</th>}
+              </For>
+              <th class="line-item-actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <For each={items}>
+              {(item, index) => (
+                <tr>
+                  <For each={field.table_fields}>
+                    {(tf) => (
+                      <td>
+                        <Switch fallback={
+                          <input
+                            type="text"
+                            value={String(item[tf.name] ?? '')}
+                            onInput={(e) => updateLineItem(field.name, index(), tf.name, e.currentTarget.value, isNewRecord)}
+                            onBlur={() => !isNewRecord && !item.id && saveNewLineItem(field.name, index())}
+                          />
+                        }>
+                          <Match when={tf.type === 'NUMBER'}>
+                            <input
+                              type="number"
+                              value={String(item[tf.name] ?? '')}
+                              onInput={(e) => updateLineItem(field.name, index(), tf.name, Number(e.currentTarget.value), isNewRecord)}
+                              onBlur={() => !isNewRecord && !item.id && saveNewLineItem(field.name, index())}
+                            />
+                          </Match>
+                          <Match when={tf.type === 'BOOL'}>
+                            <select
+                              value={item[tf.name] ? 'true' : 'false'}
+                              onChange={(e) => updateLineItem(field.name, index(), tf.name, e.currentTarget.value === 'true', isNewRecord)}
+                            >
+                              <option value="false">False</option>
+                              <option value="true">True</option>
+                            </select>
+                          </Match>
+                          <Match when={tf.type === 'SELECT'}>
+                            <select
+                              value={String(item[tf.name] ?? '')}
+                              onChange={(e) => updateLineItem(field.name, index(), tf.name, e.currentTarget.value, isNewRecord)}
+                            >
+                              <option value="">-- Select --</option>
+                              <For each={tf.select_options || []}>
+                                {(opt) => <option value={opt}>{opt}</option>}
+                              </For>
+                            </select>
+                          </Match>
+                          <Match when={tf.type === 'DATE'}>
+                            <input
+                              type="date"
+                              value={String(item[tf.name] ?? '')}
+                              onInput={(e) => updateLineItem(field.name, index(), tf.name, e.currentTarget.value, isNewRecord)}
+                              onBlur={() => !isNewRecord && !item.id && saveNewLineItem(field.name, index())}
+                            />
+                          </Match>
+                        </Switch>
+                      </td>
+                    )}
+                  </For>
+                  <td class="line-item-actions">
+                    <button
+                      type="button"
+                      class="btn btn-icon btn-danger btn-sm"
+                      onClick={() => deleteLineItem(field.name, index(), isNewRecord)}
+                    >
+                      &times;
+                    </button>
+                  </td>
+                </tr>
+              )}
+            </For>
+            <Show when={items.length === 0}>
+              <tr>
+                <td colspan={field.table_fields.length + 1} class="add-line-item-row">
+                  <button type="button" class="btn btn-sm" onClick={() => addLineItem(field.name, isNewRecord)}>
+                    + Add First Row
+                  </button>
+                </td>
+              </tr>
+            </Show>
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
+  // Render form fields (for add/edit modals)
+  const renderFormFields = (
+    formData: Record<string, string>,
+    setFormData: (key: string, value: string) => void,
+    isNewRecord: boolean = false
+  ) => {
+    const sections = getSections();
+    const hasTableFields = getTableFields().length > 0;
+
+    // If no sections, render flat list
+    if (sections.length === 0) {
+      return (
+        <>
+          <For each={collection()?.fields.filter(f => f.name !== 'id' && f.type !== 'TABLE') || []}>
+            {(field) => (
+              <div class="form-group">
+                <label>{field.name}{field.required ? ' *' : ''}</label>
+                {renderFieldInput(field, formData[field.name] || '', (v) => setFormData(field.name, v))}
+              </div>
+            )}
+          </For>
+          <Show when={hasTableFields}>
+            <For each={getTableFields()}>
+              {(field) => renderLineItemsTable(field, isNewRecord)}
+            </For>
+          </Show>
+        </>
+      );
+    }
+
+    // Render with sections
+    const unsectionedFields = getFieldsForSection(null).filter(f => f.type !== 'TABLE');
+
+    return (
+      <div class="record-sections">
+        {/* Unsectioned fields */}
+        <Show when={unsectionedFields.length > 0}>
+          <div class="record-section">
+            <div class="record-section-header">
+              <h4 class="record-section-title">General</h4>
+            </div>
+            <div class="record-section-content">
+              <For each={unsectionedFields}>
+                {(field) => (
+                  <div class="form-group">
+                    <label>{field.name}{field.required ? ' *' : ''}</label>
+                    {renderFieldInput(field, formData[field.name] || '', (v) => setFormData(field.name, v))}
+                  </div>
+                )}
+              </For>
+            </div>
+          </div>
+        </Show>
+
+        {/* Sectioned fields */}
+        <For each={sections}>
+          {(section) => {
+            const sectionFields = getFieldsForSection(section.id!).filter(f => f.type !== 'TABLE');
+            const isCollapsed = collapsedSections[section.id!];
+
+            return (
+              <Show when={sectionFields.length > 0}>
+                <div class="record-section">
+                  <div class="record-section-header" onClick={() => section.id && toggleSection(section.id)}>
+                    <span class="collapse-icon">{isCollapsed ? '>' : 'v'}</span>
+                    <h4 class="record-section-title">{section.name}</h4>
+                  </div>
+                  <Show when={!isCollapsed}>
+                    <div class="record-section-content">
+                      <For each={sectionFields}>
+                        {(field) => (
+                          <div class="form-group">
+                            <label>{field.name}{field.required ? ' *' : ''}</label>
+                            {renderFieldInput(field, formData[field.name] || '', (v) => setFormData(field.name, v))}
+                          </div>
+                        )}
+                      </For>
+                    </div>
+                  </Show>
+                </div>
+              </Show>
+            );
+          }}
+        </For>
+
+        {/* TABLE fields (always at the bottom) */}
+        <Show when={hasTableFields}>
+          <For each={getTableFields()}>
+            {(field) => renderLineItemsTable(field, isNewRecord)}
+          </For>
+        </Show>
+      </div>
+    );
+  };
+
   createEffect(() => {
-    const currentName = name(); // Track the name parameter
+    const currentName = name();
     if (currentName) {
       fetchRecords();
       fetchViews();
@@ -238,85 +654,10 @@ export function CollectionView() {
 
       <Show when={showAddForm()}>
         <div class="modal-overlay" onClick={() => setShowAddForm(false)}>
-          <div class="modal" onClick={(e) => e.stopPropagation()}>
+          <div class="modal" onClick={(e) => e.stopPropagation()} style="max-width: 640px;">
             <h3>Add Record</h3>
             <form onSubmit={handleAddRecord}>
-              <For each={columns().filter(c => c !== 'id')}>
-                {(column) => {
-                  const field = () => getField(column);
-                  const fieldType = () => field()?.type || 'TEXT';
-                  return (
-                    <div class="form-group">
-                      <label>{column}</label>
-                      <Switch fallback={
-                        <input
-                          type="text"
-                          value={newRecord[column] || ''}
-                          onInput={(e) => setNewRecord(column, e.currentTarget.value)}
-                        />
-                      }>
-                        <Match when={fieldType() === 'NUMBER'}>
-                          <input
-                            type="number"
-                            value={newRecord[column] || ''}
-                            onInput={(e) => setNewRecord(column, e.currentTarget.value)}
-                          />
-                        </Match>
-                        <Match when={fieldType() === 'BOOL'}>
-                          <select
-                            value={newRecord[column] === 'true' || newRecord[column] === '1' ? 'true' : 'false'}
-                            onChange={(e) => setNewRecord(column, e.currentTarget.value)}
-                          >
-                            <option value="false">False</option>
-                            <option value="true">True</option>
-                          </select>
-                        </Match>
-                        <Match when={fieldType() === 'SELECT'}>
-                          <select
-                            value={newRecord[column] || ''}
-                            onChange={(e) => setNewRecord(column, e.currentTarget.value)}
-                          >
-                            <option value="">-- Select --</option>
-                            <For each={field()?.select_options || []}>
-                              {(option) => <option value={option}>{option}</option>}
-                            </For>
-                          </select>
-                        </Match>
-                        <Match when={fieldType() === 'DATE'}>
-                          <input
-                            type="date"
-                            value={newRecord[column] || ''}
-                            onInput={(e) => setNewRecord(column, e.currentTarget.value)}
-                          />
-                        </Match>
-                        <Match when={fieldType() === 'EMAIL'}>
-                          <input
-                            type="email"
-                            value={newRecord[column] || ''}
-                            onInput={(e) => setNewRecord(column, e.currentTarget.value)}
-                          />
-                        </Match>
-                        <Match when={fieldType() === 'URL'}>
-                          <input
-                            type="url"
-                            placeholder="https://..."
-                            value={newRecord[column] || ''}
-                            onInput={(e) => setNewRecord(column, e.currentTarget.value)}
-                          />
-                        </Match>
-                        <Match when={fieldType() === 'JSON'}>
-                          <textarea
-                            placeholder='{"key": "value"}'
-                            value={newRecord[column] || ''}
-                            onInput={(e) => setNewRecord(column, e.currentTarget.value)}
-                            rows={3}
-                          />
-                        </Match>
-                      </Switch>
-                    </div>
-                  );
-                }}
-              </For>
+              {renderFormFields(newRecord, (k, v) => setNewRecord(k, v), true)}
               <div class="form-actions">
                 <button type="button" class="btn" onClick={() => setShowAddForm(false)}>
                   Cancel
@@ -332,85 +673,10 @@ export function CollectionView() {
 
       <Show when={editingRecord()}>
         <div class="modal-overlay" onClick={() => setEditingRecord(null)}>
-          <div class="modal" onClick={(e) => e.stopPropagation()}>
+          <div class="modal" onClick={(e) => e.stopPropagation()} style="max-width: 640px;">
             <h3>Edit Record (ID: {editingRecord()?.id as number})</h3>
             <form onSubmit={handleEditRecord}>
-              <For each={columns().filter(c => c !== 'id')}>
-                {(column) => {
-                  const field = () => getField(column);
-                  const fieldType = () => field()?.type || 'TEXT';
-                  return (
-                    <div class="form-group">
-                      <label>{column}</label>
-                      <Switch fallback={
-                        <input
-                          type="text"
-                          value={editFormData[column] || ''}
-                          onInput={(e) => setEditFormData(column, e.currentTarget.value)}
-                        />
-                      }>
-                        <Match when={fieldType() === 'NUMBER'}>
-                          <input
-                            type="number"
-                            value={editFormData[column] || ''}
-                            onInput={(e) => setEditFormData(column, e.currentTarget.value)}
-                          />
-                        </Match>
-                        <Match when={fieldType() === 'BOOL'}>
-                          <select
-                            value={editFormData[column] === 'true' || editFormData[column] === '1' ? 'true' : 'false'}
-                            onChange={(e) => setEditFormData(column, e.currentTarget.value)}
-                          >
-                            <option value="false">False</option>
-                            <option value="true">True</option>
-                          </select>
-                        </Match>
-                        <Match when={fieldType() === 'SELECT'}>
-                          <select
-                            value={editFormData[column] || ''}
-                            onChange={(e) => setEditFormData(column, e.currentTarget.value)}
-                          >
-                            <option value="">-- Select --</option>
-                            <For each={field()?.select_options || []}>
-                              {(option) => <option value={option}>{option}</option>}
-                            </For>
-                          </select>
-                        </Match>
-                        <Match when={fieldType() === 'DATE'}>
-                          <input
-                            type="date"
-                            value={editFormData[column] || ''}
-                            onInput={(e) => setEditFormData(column, e.currentTarget.value)}
-                          />
-                        </Match>
-                        <Match when={fieldType() === 'EMAIL'}>
-                          <input
-                            type="email"
-                            value={editFormData[column] || ''}
-                            onInput={(e) => setEditFormData(column, e.currentTarget.value)}
-                          />
-                        </Match>
-                        <Match when={fieldType() === 'URL'}>
-                          <input
-                            type="url"
-                            placeholder="https://..."
-                            value={editFormData[column] || ''}
-                            onInput={(e) => setEditFormData(column, e.currentTarget.value)}
-                          />
-                        </Match>
-                        <Match when={fieldType() === 'JSON'}>
-                          <textarea
-                            placeholder='{"key": "value"}'
-                            value={editFormData[column] || ''}
-                            onInput={(e) => setEditFormData(column, e.currentTarget.value)}
-                            rows={3}
-                          />
-                        </Match>
-                      </Switch>
-                    </div>
-                  );
-                }}
-              </For>
+              {renderFormFields(editFormData, (k, v) => setEditFormData(k, v), false)}
               <div class="form-actions">
                 <button type="button" class="btn" onClick={() => setEditingRecord(null)}>
                   Cancel
