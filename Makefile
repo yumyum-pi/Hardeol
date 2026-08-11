@@ -1,11 +1,8 @@
 .PHONY: build build-server build-ui dev dev-server dev-ui install install-server install-ui clean help
 
-# Go environment for macOS 10.15 compatibility
-export GOROOT=/opt/local/lib/go-1.22
 export OTOOLCHAIN=local
 export BUILD_DIR=./build
 export BUILD_NAME=hardeol_server  
-GO=$(GOROOT)/bin/go
 
 # Default target
 all: build
@@ -14,14 +11,14 @@ all: build
 build: build-server build-ui
 
 build-server:
-	$(GO) build -o ${BUILD_DIR}/${BUILD_NAME} ./cmd/main.go
+	go build -o ${BUILD_DIR}/${BUILD_NAME} ./cmd/main.go
 
 build-ui:
 	cd UI && npm run build
 
 # Development servers
 dev-server:
-	air
+	go tool air
 
 dev-ui:
 	cd UI && npm run dev
@@ -35,7 +32,7 @@ dev:
 install: install-server install-ui
 
 install-server:
-	$(GO) mod download
+	go mod download
 
 install-ui:
 	cd UI && npm install

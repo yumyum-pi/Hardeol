@@ -4,8 +4,8 @@ tmp_dir = "tmp"
 
 [build]
   args_bin = []
-  bin = "./build/main"
-  cmd = "GOROOT=/opt/local/lib/go-1.22 GOTOOLCHAIN=local /opt/local/lib/go-1.22/bin/go build -o ./build/main ./cmd/main.go"
+  bin = "./build/hardeol_server_dev"
+  cmd = "go build -o ./build/hardeol_server_dev ./cmd/main.go"
   delay = 1000
   exclude_dir = ["assets", "tmp", "vendor", "database", "out", "UI"]
   exclude_file = ["./database/database.db"]
