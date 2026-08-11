@@ -7,7 +7,7 @@ import (
 
 var db *gorm.DB
 
-var DatabasePath = "/Users/vivekrawat/project/Hardeol/database/test.db"
+var DatabasePath = "./database/test.db"
 
 // Initialize GORM DB connection
 func InitSqlite() {
