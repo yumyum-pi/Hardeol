@@ -70,3 +70,5 @@ Run `make help` to list all available targets.
 ---
 
 Hardeol is one of the major peaks of the Kumaon Himalaya.
+
+TODO: Fix the router
