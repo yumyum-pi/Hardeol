@@ -1,4 +1,4 @@
-import { createSignal, createEffect, For, Show, Switch, Match } from 'solid-js';
+import { createSignal, createEffect, For, Show, Switch, Match, onMount } from 'solid-js';
 import { createStore, produce } from 'solid-js/store';
 import { useParams, useNavigate, useSearchParams, A } from '@solidjs/router';
 import { api, Collection, SchemaField, TableView, Section, FieldType, FormView, FormFieldConfig, ValidationProfile, ValidationError } from '../api/client';
@@ -20,11 +20,12 @@ export function CollectionView() {
   const params = useParams();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const name = () => params.name;
+  const name = () => params.name ?? '';
   const [records, setRecords] = createSignal<Record<string, unknown>[]>([]);
   const [columns, setColumns] = createSignal<string[]>([]);
   const [loading, setLoading] = createSignal(true);
   const [error, setError] = createSignal<string | null>(null);
+  const [isCollection, setIsCollection] = createSignal(false);
   const [showAddForm, setShowAddForm] = createSignal(false);
   const [newRecord, setNewRecord] = createStore<Record<string, string>>({});
   const [collection, setCollection] = createSignal<Collection | null>(null);
@@ -57,8 +58,10 @@ export function CollectionView() {
     const response = await api.listRecords(name());
     if (response.error) {
       setError(response.error);
+      setIsCollection(false)
     } else {
       const data = response.data || [];
+      setIsCollection(true)
       setRecords(data);
       const colResponse = await api.listCollections();
       const col = colResponse.data?.find(c => c.name === name());
@@ -900,10 +903,14 @@ export function CollectionView() {
       </div>
     );
   };
+  onMount(() => {
+    fetchRecords();
+  });
 
   createEffect(() => {
     const currentName = name();
-    if (currentName) {
+    const collection = isCollection();
+    if (currentName && collection) {
       fetchRecords();
       fetchViews();
       fetchFormViews();
@@ -911,217 +918,225 @@ export function CollectionView() {
     }
   });
 
+  const NoCollectionView = () => {
+    return (
+      <div>No Collection Found</div>
+    )
+  }
+
   return (
     <div class="collection-view">
-      <header class="page-header">
-        <div class="header-left">
-          <A href="/" class="btn btn-text">
-            &larr; Back
-          </A>
-          <h2>{name()}</h2>
-        </div>
-        <div class="header-actions">
-          <ViewSelector
-            views={views()}
-            selectedViewId={selectedViewId()}
-            onSelect={handleViewSelect}
-          />
-          <div class="dropdown">
-            <button class="btn" onClick={() => setShowOptionsMenu(!showOptionsMenu())}>
-              Options
+      <Show when={isCollection()} fallback={NoCollectionView()}>
+        <header class="page-header">
+          <div class="header-left">
+            <A href="/" class="btn btn-text">
+              {"<"}
+            </A>
+            <h2>{name()}</h2>
+          </div>
+          <div class="header-actions">
+            <ViewSelector
+              views={views()}
+              selectedViewId={selectedViewId()}
+              onSelect={handleViewSelect}
+            />
+            <div class="dropdown">
+              <button class="btn" onClick={() => setShowOptionsMenu(!showOptionsMenu())}>
+                Options
+              </button>
+              <Show when={showOptionsMenu()}>
+                <div class="dropdown-menu" onClick={() => setShowOptionsMenu(false)}>
+                  <button class="dropdown-item" onClick={() => setShowViewManager(true)}>
+                    Manage Table Views
+                  </button>
+                  <button class="dropdown-item" onClick={() => setShowFormViewManager(true)}>
+                    Manage Form Views
+                  </button>
+                  <button class="dropdown-item" onClick={() => setShowValidationManager(true)}>
+                    Manage Validation
+                  </button>
+                  <Show when={collection()}>
+                    <A href={`/collection/${name()}/edit`} class="dropdown-item">
+                      Edit Schema
+                    </A>
+                  </Show>
+                </div>
+              </Show>
+            </div>
+            <button class="btn btn-primary" onClick={() => setShowAddForm(true)}>
+              + Add Record
             </button>
-            <Show when={showOptionsMenu()}>
-              <div class="dropdown-menu" onClick={() => setShowOptionsMenu(false)}>
-                <button class="dropdown-item" onClick={() => setShowViewManager(true)}>
-                  Manage Table Views
-                </button>
-                <button class="dropdown-item" onClick={() => setShowFormViewManager(true)}>
-                  Manage Form Views
-                </button>
-                <button class="dropdown-item" onClick={() => setShowValidationManager(true)}>
-                  Manage Validation
-                </button>
-                <Show when={collection()}>
-                  <A href={`/collection/${name()}/edit`} class="dropdown-item">
-                    Edit Schema
-                  </A>
+          </div>
+        </header>
+
+        <Show when={error()}>
+          <div class="error-banner">{error()}</div>
+        </Show>
+
+        <Show when={showAddForm()}>
+          <div class="modal-overlay" onClick={() => setShowAddForm(false)}>
+            <div class="modal" onClick={(e) => e.stopPropagation()} style="max-width: 720px;">
+              <div class="modal-header-with-selector">
+                <h3>Add Record</h3>
+                <FormViewSelector
+                  views={getFormViewsForAction('CREATE')}
+                  selectedViewId={selectedCreateViewId()}
+                  onSelect={setSelectedCreateViewId}
+                />
+              </div>
+              <form onSubmit={handleAddRecord}>
+                <Show when={validationErrors().length > 0 && getCollectionErrors(validationErrors()).length > 0}>
+                  <div class="validation-error-banner">
+                    <h4>Validation Errors</h4>
+                    <ul class="validation-error-list">
+                      <For each={getCollectionErrors(validationErrors())}>
+                        {(err) => <li>{err.message}</li>}
+                      </For>
+                    </ul>
+                  </div>
                 </Show>
-              </div>
-            </Show>
-          </div>
-          <button class="btn btn-primary" onClick={() => setShowAddForm(true)}>
-            + Add Record
-          </button>
-        </div>
-      </header>
-
-      <Show when={error()}>
-        <div class="error-banner">{error()}</div>
-      </Show>
-
-      <Show when={showAddForm()}>
-        <div class="modal-overlay" onClick={() => setShowAddForm(false)}>
-          <div class="modal" onClick={(e) => e.stopPropagation()} style="max-width: 720px;">
-            <div class="modal-header-with-selector">
-              <h3>Add Record</h3>
-              <FormViewSelector
-                views={getFormViewsForAction('CREATE')}
-                selectedViewId={selectedCreateViewId()}
-                onSelect={setSelectedCreateViewId}
-              />
-            </div>
-            <form onSubmit={handleAddRecord}>
-              <Show when={validationErrors().length > 0 && getCollectionErrors(validationErrors()).length > 0}>
-                <div class="validation-error-banner">
-                  <h4>Validation Errors</h4>
-                  <ul class="validation-error-list">
-                    <For each={getCollectionErrors(validationErrors())}>
-                      {(err) => <li>{err.message}</li>}
-                    </For>
-                  </ul>
+                {renderFormFields(newRecord, (k, v) => setNewRecord(k, v), true)}
+                <div class="form-actions">
+                  <button type="button" class="btn" onClick={() => { setShowAddForm(false); setValidationErrors([]); }}>
+                    Cancel
+                  </button>
+                  <button type="submit" class="btn btn-primary">
+                    Create
+                  </button>
                 </div>
-              </Show>
-              {renderFormFields(newRecord, (k, v) => setNewRecord(k, v), true)}
-              <div class="form-actions">
-                <button type="button" class="btn" onClick={() => { setShowAddForm(false); setValidationErrors([]); }}>
-                  Cancel
-                </button>
-                <button type="submit" class="btn btn-primary">
-                  Create
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </Show>
-
-      <Show when={editingRecord()}>
-        <div class="modal-overlay" onClick={() => { setEditingRecord(null); setValidationErrors([]); }}>
-          <div class="modal" onClick={(e) => e.stopPropagation()} style="max-width: 720px;">
-            <div class="modal-header-with-selector">
-              <h3>Edit Record (ID: {editingRecord()?.id as number})</h3>
-              <FormViewSelector
-                views={getFormViewsForAction('UPDATE')}
-                selectedViewId={selectedUpdateViewId()}
-                onSelect={setSelectedUpdateViewId}
-              />
+              </form>
             </div>
-            <form onSubmit={handleEditRecord}>
-              <Show when={validationErrors().length > 0 && getCollectionErrors(validationErrors()).length > 0}>
-                <div class="validation-error-banner">
-                  <h4>Validation Errors</h4>
-                  <ul class="validation-error-list">
-                    <For each={getCollectionErrors(validationErrors())}>
-                      {(err) => <li>{err.message}</li>}
-                    </For>
-                  </ul>
-                </div>
-              </Show>
-              {renderFormFields(editFormData, (k, v) => setEditFormData(k, v), false)}
-              <div class="form-actions">
-                <button type="button" class="btn" onClick={() => { setEditingRecord(null); setValidationErrors([]); }}>
-                  Cancel
-                </button>
-                <button type="submit" class="btn btn-primary">
-                  Save
-                </button>
-              </div>
-            </form>
           </div>
-        </div>
-      </Show>
+        </Show>
 
-      <Show when={loading()}>
-        <div class="loading">Loading...</div>
-      </Show>
+        <Show when={editingRecord()}>
+          <div class="modal-overlay" onClick={() => { setEditingRecord(null); setValidationErrors([]); }}>
+            <div class="modal" onClick={(e) => e.stopPropagation()} style="max-width: 720px;">
+              <div class="modal-header-with-selector">
+                <h3>Edit Record (ID: {editingRecord()?.id as number})</h3>
+                <FormViewSelector
+                  views={getFormViewsForAction('UPDATE')}
+                  selectedViewId={selectedUpdateViewId()}
+                  onSelect={setSelectedUpdateViewId}
+                />
+              </div>
+              <form onSubmit={handleEditRecord}>
+                <Show when={validationErrors().length > 0 && getCollectionErrors(validationErrors()).length > 0}>
+                  <div class="validation-error-banner">
+                    <h4>Validation Errors</h4>
+                    <ul class="validation-error-list">
+                      <For each={getCollectionErrors(validationErrors())}>
+                        {(err) => <li>{err.message}</li>}
+                      </For>
+                    </ul>
+                  </div>
+                </Show>
+                {renderFormFields(editFormData, (k, v) => setEditFormData(k, v), false)}
+                <div class="form-actions">
+                  <button type="button" class="btn" onClick={() => { setEditingRecord(null); setValidationErrors([]); }}>
+                    Cancel
+                  </button>
+                  <button type="submit" class="btn btn-primary">
+                    Save
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </Show>
 
-      <Show when={!loading() && records().length === 0}>
-        <div class="empty-state">
-          <p>No records in this collection</p>
-          <button class="btn btn-primary" onClick={() => setShowAddForm(true)}>
-            Add your first record
-          </button>
-        </div>
-      </Show>
+        <Show when={loading()}>
+          <div class="loading">Loading...</div>
+        </Show>
 
-      <Show when={!loading() && records().length > 0}>
-        <div class="table-container">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <For each={displayColumns()}>
-                  {(column) => <th class={getColumnCssClass(column)}>{column}</th>}
+        <Show when={!loading() && records().length === 0}>
+          <div class="empty-state">
+            <p>No records in this collection</p>
+            <button class="btn btn-primary" onClick={() => setShowAddForm(true)}>
+              Add your first record
+            </button>
+          </div>
+        </Show>
+
+        <Show when={!loading() && records().length > 0}>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <For each={displayColumns()}>
+                    {(column) => <th class={getColumnCssClass(column)}>{column}</th>}
+                  </For>
+                  <th class="actions-col">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <For each={records()}>
+                  {(record) => (
+                    <tr>
+                      <For each={displayColumns()}>
+                        {(column) => <td class={getColumnCssClass(column)}>{String(record[column] ?? '')}</td>}
+                      </For>
+                      <td class="actions-col">
+                        <button
+                          class="btn btn-sm"
+                          onClick={() => openEditForm(record)}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          class="btn btn-danger btn-sm"
+                          onClick={() => handleDelete(record.id as number)}
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  )}
                 </For>
-                <th class="actions-col">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <For each={records()}>
-                {(record) => (
-                  <tr>
-                    <For each={displayColumns()}>
-                      {(column) => <td class={getColumnCssClass(column)}>{String(record[column] ?? '')}</td>}
-                    </For>
-                    <td class="actions-col">
-                      <button
-                        class="btn btn-sm"
-                        onClick={() => openEditForm(record)}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        class="btn btn-danger btn-sm"
-                        onClick={() => handleDelete(record.id as number)}
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                )}
-              </For>
-            </tbody>
-          </table>
-        </div>
-      </Show>
+              </tbody>
+            </table>
+          </div>
+        </Show>
 
-      <Show when={showViewManager() && collection()}>
-        <ViewManager
-          collectionName={name()}
-          schemaFields={collection()!.fields}
-          views={views()}
-          onClose={() => setShowViewManager(false)}
-          onViewsChanged={() => {
-            fetchViews();
-            setShowViewManager(false);
-          }}
-        />
-      </Show>
+        <Show when={showViewManager() && collection()}>
+          <ViewManager
+            collectionName={name()}
+            schemaFields={collection()!.fields}
+            views={views()}
+            onClose={() => setShowViewManager(false)}
+            onViewsChanged={() => {
+              fetchViews();
+              setShowViewManager(false);
+            }}
+          />
+        </Show>
 
-      <Show when={showFormViewManager() && collection()}>
-        <FormViewManager
-          collectionName={name()}
-          schemaFields={collection()!.fields}
-          views={formViews()}
-          onClose={() => setShowFormViewManager(false)}
-          onViewsChanged={() => {
-            fetchFormViews();
-            setShowFormViewManager(false);
-          }}
-        />
-      </Show>
+        <Show when={showFormViewManager() && collection()}>
+          <FormViewManager
+            collectionName={name()}
+            schemaFields={collection()!.fields}
+            views={formViews()}
+            onClose={() => setShowFormViewManager(false)}
+            onViewsChanged={() => {
+              fetchFormViews();
+              setShowFormViewManager(false);
+            }}
+          />
+        </Show>
 
-      <Show when={showValidationManager() && collection()}>
-        <ValidationProfileManager
-          collectionName={name()}
-          schemaFields={collection()!.fields}
-          sections={collection()!.sections || []}
-          profiles={validationProfiles()}
-          onClose={() => setShowValidationManager(false)}
-          onProfilesChanged={() => {
-            fetchValidationProfiles();
-            setShowValidationManager(false);
-          }}
-        />
+        <Show when={showValidationManager() && collection()}>
+          <ValidationProfileManager
+            collectionName={name()}
+            schemaFields={collection()!.fields}
+            sections={collection()!.sections || []}
+            profiles={validationProfiles()}
+            onClose={() => setShowValidationManager(false)}
+            onProfilesChanged={() => {
+              fetchValidationProfiles();
+              setShowValidationManager(false);
+            }}
+          />
+        </Show>
       </Show>
     </div>
   );
