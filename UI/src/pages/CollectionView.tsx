@@ -930,7 +930,7 @@ export function CollectionView() {
         <header class="page-header">
           <div class="header-left">
             <A href="/" class="btn btn-text">
-              {"<"}
+              {"back"}
             </A>
             <h2>{name()}</h2>
           </div>

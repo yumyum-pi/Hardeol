@@ -1,7 +1,8 @@
 import { createSignal, For, Show, onMount } from 'solid-js';
 import { createStore, produce } from 'solid-js/store';
 import { useParams, useNavigate } from '@solidjs/router';
-import { api, Collection, FieldType } from '../api/client';
+import { api, Collection, FieldType } from '../../api/client';
+import NameTransformer from '../../utils/nameTransformer';
 
 interface Field {
   name: string;
@@ -19,7 +20,7 @@ interface SectionState {
   fields: Field[];
 }
 
-export function SchemaBuilder() {
+export function CollectionEditor() {
   const params = useParams();
   const navigate = useNavigate();
   const [collection, setCollection] = createSignal<Collection | undefined>(undefined);
@@ -102,26 +103,6 @@ export function SchemaBuilder() {
     }
   });
 
-  const nameTransformer = (input: string): string => {
-    if (input.length === 0) return "";
-    const diff = 97 - 65;
-    let newString = "";
-    for (let i = 0; i < input.length; i++) {
-      const char = input[i];
-      if (char === ' ') {
-        newString += '_';
-      } else if (char >= 'a' && char <= 'z') {
-        newString += char;
-      } else if (char >= 'A' && char <= 'Z') {
-        newString += String.fromCharCode(char.charCodeAt(0) + diff);
-      } else if (char === '_') {
-        newString += '_';
-      } else if (char >= '0' && char <= '9' && i > 0) {
-        newString += char;
-      }
-    }
-    return newString;
-  };
 
   // Section management
   const addSection = () => {
@@ -184,7 +165,7 @@ export function SchemaBuilder() {
 
     // Create TABLE field from section
     const tableField: Field = {
-      name: nameTransformer(section.name),
+      name: NameTransformer(section.name),
       type: 'TABLE',
       required: false,
       table_fields: validFields.map(f => ({
@@ -442,7 +423,7 @@ export function SchemaBuilder() {
             type="text"
             placeholder="Field name"
             value={field.name}
-            onInput={(e) => onUpdate('name', nameTransformer(e.currentTarget.value))}
+            onInput={(e) => onUpdate('name', NameTransformer(e.currentTarget.value))}
             class="field-name-input"
           />
           <select
@@ -579,7 +560,7 @@ export function SchemaBuilder() {
               type="text"
               placeholder="e.g., users, posts, products"
               value={name()}
-              onInput={(e) => setName(nameTransformer(e.currentTarget.value))}
+              onInput={(e) => setName(NameTransformer(e.currentTarget.value))}
               pattern="^[a-zA-Z][a-zA-Z0-9_]*$"
               title="Must start with letter, alphanumeric and underscore only"
               disabled={isEditMode()}

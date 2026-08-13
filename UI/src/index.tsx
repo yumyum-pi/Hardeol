@@ -2,9 +2,9 @@ import { render } from 'solid-js/web';
 import { Router, Route } from '@solidjs/router';
 import { createSignal, onMount } from 'solid-js';
 import { Sidebar } from './components/Sidebar';
-import { CollectionList } from './components/CollectionList';
-import { CollectionView } from './components/CollectionView';
-import { SchemaBuilder } from './components/SchemaBuilder';
+import { CollectionList } from './pages/CollectionList';
+import { CollectionView } from './pages/CollectionView';
+import { CollectionEditor } from './pages/collectionEditor';
 import { api, Collection } from './api/client';
 import './styles/global.css';
 
@@ -62,8 +62,8 @@ if (root) {
     <Router root={Layout}>
       <Route path="/" component={HomePage} />
       <Route path="/collection/:name" component={CollectionView} />
-      <Route path="/new" component={SchemaBuilder} />
-      <Route path="/collection/:name/edit" component={SchemaBuilder} />
+      <Route path="/new" component={CollectionEditor} />
+      <Route path="/collection/:name/edit" component={CollectionEditor} />
     </Router>
   ), root);
 }
