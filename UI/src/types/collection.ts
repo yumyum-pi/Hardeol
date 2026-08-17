@@ -11,7 +11,6 @@ export interface Field {
 
 export interface SectionState {
   name: string;
-  collapsed: boolean;
   fields: Field[];
 }
 

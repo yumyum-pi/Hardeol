@@ -15,15 +15,14 @@ type SchemaSectionEditorProps = {
 
   updateSectionName: (index: number, name: string) => void;
   removeSection(sectionIndex: number): void;
-
+  canRemoveSection: boolean;
 
   addSectionField(sectionIndex: number): void;
-  removeSectionField(arg0: any, arg1: number): unknown;
-  updateSectionField(sectionIndex: number, arg1: number, key: any, value: any): unknown;
-
+  removeSectionField(sectionIndex: number, fieldIndex: number): void;
+  updateSectionField(sectionIndex: number, fieldIndex: number, key: keyof Field, value: unknown): void;
 
   removeTableField(sectionIndex: number, fieldIndex: number, index: number): void;
-  updateTableField(sectionIndex: number, fieldIndex: number, index: number, key: string, value: unknown): void;
+  updateTableField(sectionIndex: number, fieldIndex: number, index: number, key: keyof Field, value: unknown): void;
   addTableField(sectionIndex: number, fieldIndex: number): void;
 }
 
@@ -56,7 +55,13 @@ export const SchemaSectionEditor = (props: SchemaSectionEditorProps) => {
         <button type="button" class="btn btn-sm" onClick={() => props.addSectionField(props.sectionIndex)}>
           + Add Field
         </button>
-        <button type="button" class="btn btn-icon btn-danger btn-sm" onClick={() => props.removeSection(props.sectionIndex)} title="Remove section">
+        <button
+          type="button"
+          class="btn btn-icon btn-danger btn-sm"
+          onClick={() => props.removeSection(props.sectionIndex)}
+          disabled={!props.canRemoveSection}
+          title={props.canRemoveSection ? 'Remove section' : 'At least one section is required'}
+        >
           &times;
         </button>
       </div>
@@ -71,7 +76,8 @@ export const SchemaSectionEditor = (props: SchemaSectionEditorProps) => {
                 field={field}
                 onUpdate={(key: keyof Field, value: unknown) => props.updateSectionField(props.sectionIndex, fieldIndex(), key, value)}
                 onRemove={() => props.removeSectionField(props.sectionIndex, fieldIndex())}
-                isTableFolded={true}
+                allowTableType={true}
+                isTableFolded={isTableFolded()}
                 toggleTableFolded={() => setIsTableFolded(v => !v)}
                 canRemove={true}
               />
@@ -81,7 +87,6 @@ export const SchemaSectionEditor = (props: SchemaSectionEditorProps) => {
                     field={field}
                     sectionIndex={props.sectionIndex}
                     fieldIndex={fieldIndex()}
-                    isTableFolded={isTableFolded()}
 
                     removeTableField={props.removeTableField}
                     updateTableField={props.updateTableField}

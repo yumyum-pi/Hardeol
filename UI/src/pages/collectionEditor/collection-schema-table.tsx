@@ -6,10 +6,8 @@ type SchemaTableFieldEditorProps = {
   field: Field, sectionIndex: number,
   fieldIndex: number
 
-  isTableFolded: boolean;
-
   removeTableField(sectionIndex: number, fieldIndex: number, index: number): void;
-  updateTableField(sectionIndex: number, fieldIndex: number, index: number, key: string, value: unknown): void;
+  updateTableField(sectionIndex: number, fieldIndex: number, index: number, key: keyof Field, value: unknown): void;
   addTableField(sectionIndex: number, fieldIndex: number): void;
 }
 export const SchemaTableFieldEditor = (props: SchemaTableFieldEditorProps) => {
@@ -32,6 +30,7 @@ export const SchemaTableFieldEditor = (props: SchemaTableFieldEditorProps) => {
                 onUpdate={(key, value) => props.updateTableField(props.sectionIndex, props.fieldIndex, idx(), key, value)}
                 onRemove={() => props.removeTableField(props.sectionIndex, props.fieldIndex, idx())}
                 canRemove={(props.field.table_fields?.length || 0) > 1}
+                allowTableType={false}
                 isTableFolded={false}
               />
             );

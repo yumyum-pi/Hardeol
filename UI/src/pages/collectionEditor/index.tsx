@@ -3,7 +3,7 @@ import { createStore, produce } from 'solid-js/store';
 import { useParams, useNavigate } from '@solidjs/router';
 import { api } from '../../api/client';
 import NameTransformer from '../../utils/nameTransformer';
-import { Collection, Field, SectionState } from '../../types/collection';
+import { Collection, Field, SchemaField, SectionState } from '../../types/collection';
 import { SchemaSectionEditor } from './collection-schema-section';
 
 export function CollectionEditor() {
@@ -13,12 +13,10 @@ export function CollectionEditor() {
   const isEditMode = () => !!params.name;
 
   const [name, setName] = createSignal('');
-  const [unsectionedFields, setUnsectionedFields] = createStore<Field[]>([]);
   const [sections, setSections] = createStore<SectionState[]>([]);
   const [error, setError] = createSignal<string | null>(null);
   const [saving, setSaving] = createSignal(false);
   const [showRemovalWarning, setShowRemovalWarning] = createSignal(false);
-  const [editingTableField, setEditingTableField] = createSignal<{ sectionIndex: number | null; fieldIndex: number } | null>(null);
 
   onMount(async () => {
     if (params.name) {
@@ -74,18 +72,20 @@ export function CollectionEditor() {
             }
           });
 
-        // Set sections with their fields
-        setSections(sortedSections.map((s, idx) => ({
-          name: s.name,
-          collapsed: false,
-          fields: sectionFields[idx],
-        })));
-
-        setUnsectionedFields(unsectioned);
+        // Set sections with their fields; merge any orphaned (unsectioned) fields
+        // into the first section, creating one if the collection has none.
+        if (sortedSections.length === 0 && unsectioned.length > 0) {
+          setSections([{ name: 'Section 1', fields: unsectioned }]);
+        } else {
+          setSections(sortedSections.map((s, idx) => ({
+            name: s.name,
+            fields: idx === 0 ? [...sectionFields[0], ...unsectioned] : sectionFields[idx],
+          })));
+        }
       }
     } else {
-      // New collection - start with one empty field
-      setUnsectionedFields([{ name: '', type: 'TEXT', required: false }]);
+      // New collection - start with one section containing one empty field
+      addSection();
     }
   });
 
@@ -94,7 +94,6 @@ export function CollectionEditor() {
   const addSection = () => {
     setSections(produce((s) => s.push({
       name: `Section ${s.length + 1}`,
-      collapsed: false,
       fields: [{ name: '', type: 'TEXT', required: false }]
     })));
   };
@@ -104,9 +103,11 @@ export function CollectionEditor() {
   };
 
   const removeSection = (index: number) => {
-    // Move fields from this section to unsectioned
-    const sectionFields = sections[index].fields;
-    setUnsectionedFields(produce((f) => f.push(...sectionFields)));
+    if (sections.length <= 1) return;
+    // Move fields from the removed section into an adjacent remaining section
+    const targetIndex = index > 0 ? index - 1 : index + 1;
+    const removedFields = sections[index].fields;
+    setSections(targetIndex, 'fields', produce((f) => f.push(...removedFields)));
     setSections(produce((s) => s.splice(index, 1)));
   };
 
@@ -150,57 +151,29 @@ export function CollectionEditor() {
   };
 
   // TABLE field nested fields management
-  const addTableField = (sectionIndex: number | null, fieldIndex: number) => {
-    if (sectionIndex === null) {
-      setUnsectionedFields(produce((f) => {
-        if (!f[fieldIndex].table_fields) {
-          f[fieldIndex].table_fields = [];
-        }
-        f[fieldIndex].table_fields!.push({ name: '', type: 'TEXT', required: false });
-      }));
-    } else {
-      setSections(sectionIndex, 'fields', produce((f) => {
-        if (!f[fieldIndex].table_fields) {
-          f[fieldIndex].table_fields = [];
-        }
-        f[fieldIndex].table_fields!.push({ name: '', type: 'TEXT', required: false });
-      }));
-    }
+  const addTableField = (sectionIndex: number, fieldIndex: number) => {
+    setSections(sectionIndex, 'fields', produce((f) => {
+      if (!f[fieldIndex].table_fields) {
+        f[fieldIndex].table_fields = [];
+      }
+      f[fieldIndex].table_fields!.push({ name: '', type: 'TEXT', required: false });
+    }));
   };
 
-  const removeTableField = (sectionIndex: number | null, fieldIndex: number, tableFieldIndex: number) => {
-    if (sectionIndex === null) {
-      setUnsectionedFields(produce((f) => {
-        f[fieldIndex].table_fields?.splice(tableFieldIndex, 1);
-      }));
-    } else {
-      setSections(sectionIndex, 'fields', produce((f) => {
-        f[fieldIndex].table_fields?.splice(tableFieldIndex, 1);
-      }));
-    }
+  const removeTableField = (sectionIndex: number, fieldIndex: number, tableFieldIndex: number) => {
+    setSections(sectionIndex, 'fields', produce((f) => {
+      f[fieldIndex].table_fields?.splice(tableFieldIndex, 1);
+    }));
   };
 
-  const updateTableField = (sectionIndex: number | null, fieldIndex: number, tableFieldIndex: number, key: keyof Field, value: unknown) => {
-    if (sectionIndex === null) {
-      setUnsectionedFields(produce((f) => {
-        if (f[fieldIndex].table_fields && f[fieldIndex].table_fields![tableFieldIndex]) {
-          (f[fieldIndex].table_fields![tableFieldIndex] as any)[key] = value;
-        }
-      }));
-    } else {
-      setSections(sectionIndex, 'fields', produce((f) => {
-        if (f[fieldIndex].table_fields && f[fieldIndex].table_fields![tableFieldIndex]) {
-          (f[fieldIndex].table_fields![tableFieldIndex] as any)[key] = value;
-        }
-      }));
-    }
+  const updateTableField = (sectionIndex: number, fieldIndex: number, tableFieldIndex: number, key: keyof Field, value: unknown) => {
+    setSections(sectionIndex, 'fields', produce((f) => {
+      const tf = f[fieldIndex].table_fields?.[tableFieldIndex];
+      if (tf) {
+        tf[key] = value as never;
+      }
+    }));
   };
-
-  const isEditingTableField = (sectionIndex: number | null, fieldIndex: number) => {
-    const editing = editingTableField();
-    return editing && editing.sectionIndex === sectionIndex && editing.fieldIndex === fieldIndex;
-  };
-
 
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
@@ -212,14 +185,8 @@ export function CollectionEditor() {
     }
 
     // Collect all valid fields
-    const allFields: { field: Field; sectionIndex: number | null }[] = [];
+    const allFields: { field: Field; sectionIndex: number }[] = [];
 
-    // Unsectioned fields
-    unsectionedFields.filter(f => f.name.trim()).forEach(f => {
-      allFields.push({ field: f, sectionIndex: null });
-    });
-
-    // Section fields
     sections.forEach((section, sectionIndex) => {
       section.fields.filter(f => f.name.trim()).forEach(f => {
         allFields.push({ field: f, sectionIndex });
@@ -250,7 +217,7 @@ export function CollectionEditor() {
         selectOptions = field.select_options_text.split(',').map(s => s.trim()).filter(Boolean);
       }
 
-      const fieldObj: any = {
+      const fieldObj: Omit<SchemaField, 'id' | 'collection_id'> = {
         name: field.name.trim(),
         type: field.type,
         required: field.required,
@@ -374,6 +341,7 @@ export function CollectionEditor() {
 
                 updateSectionName={updateSectionName}
                 removeSection={removeSection}
+                canRemoveSection={sections.length > 1}
 
                 addSectionField={addSectionField}
                 removeSectionField={removeSectionField}

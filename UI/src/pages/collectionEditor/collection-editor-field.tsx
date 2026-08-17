@@ -8,18 +8,17 @@ type SchemaEditorFieldProps = {
   onRemove: () => void,
   canRemove: boolean,
 
-
+  // Nested TABLE columns can't themselves be TABLE fields (no nested tables).
+  allowTableType: boolean;
   isTableFolded: boolean;
   toggleTableFolded?: () => void;
-
 }
 
 // Render a single field row
 export const SchemaFieldEditor = (props: SchemaEditorFieldProps) => {
-  const isTableField = props.field.type === 'TABLE';
-  const fieldTypes: FieldType[] = !isTableField && !props.isTableFolded
-    ? ['TEXT', 'NUMBER', 'BOOL', 'EMAIL', 'URL', 'DATE', 'SELECT', 'JSON']
-    : ['TEXT', 'NUMBER', 'BOOL', 'EMAIL', 'URL', 'DATE', 'SELECT', 'JSON', 'TABLE'];
+  const fieldTypes: FieldType[] = props.allowTableType
+    ? ['TEXT', 'NUMBER', 'BOOL', 'EMAIL', 'URL', 'DATE', 'SELECT', 'JSON', 'TABLE']
+    : ['TEXT', 'NUMBER', 'BOOL', 'EMAIL', 'URL', 'DATE', 'SELECT', 'JSON'];
 
   return (
     <div class={`field-row`}>
@@ -71,7 +70,7 @@ export const SchemaFieldEditor = (props: SchemaEditorFieldProps) => {
         </label>
       </div>
 
-      <Show when={isTableField && props.field.type === 'TABLE'}>
+      <Show when={props.field.type === 'TABLE'}>
         <button
           type="button"
           class="btn btn-sm"
