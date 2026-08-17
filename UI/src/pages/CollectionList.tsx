@@ -1,6 +1,6 @@
 import { onMount, For, Accessor } from 'solid-js';
 import { A } from '@solidjs/router';
-import type { Collection } from '../api/client';
+import type { Collection } from '../types/collection';
 
 interface CollectionListProps {
   collections: Accessor<Collection[]>;

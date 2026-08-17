@@ -2,15 +2,15 @@
  * Client-side validation matching the Go implementation.
  */
 
+import { ValidationResult } from '../api/client';
 import {
   FieldRule,
   SectionRule,
   CollectionRule,
   ValidationError,
-  ValidationResult,
   SchemaField,
   ConditionalRule,
-} from '../api/client';
+} from '../types/collection';
 import { evaluateExpression, parseDateExpression } from './expression-evaluator';
 
 interface ValidationProfile {

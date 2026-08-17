@@ -1,5 +1,5 @@
 import { For, Show } from 'solid-js';
-import { TableView } from '../api/client';
+import { TableView } from '../types/collection';
 
 interface ViewSelectorProps {
   views: TableView[];

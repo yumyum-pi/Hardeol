@@ -1,7 +1,7 @@
 import { createSignal, For, Show } from 'solid-js';
 import { createStore } from 'solid-js/store';
+import { api } from '../api/client';
 import {
-  api,
   ValidationProfile,
   FieldRule,
   SectionRule,
@@ -9,7 +9,7 @@ import {
   SchemaField,
   Section,
   ActionType,
-} from '../api/client';
+} from '../types/collection';
 
 interface ValidationProfileManagerProps {
   collectionName: string;

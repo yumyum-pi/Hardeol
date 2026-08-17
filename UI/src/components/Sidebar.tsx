@@ -1,6 +1,6 @@
 import { onMount, For } from 'solid-js';
 import { A, useLocation } from '@solidjs/router';
-import { Collection } from '../api/client';
+import { Collection } from '../types/collection';
 
 interface SidebarProps {
   collections: Collection[];

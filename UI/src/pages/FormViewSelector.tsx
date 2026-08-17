@@ -1,5 +1,5 @@
 import { For, Show } from 'solid-js';
-import { FormView } from '../api/client';
+import { FormView } from '../types/collection';
 
 interface FormViewSelectorProps {
   views: FormView[];

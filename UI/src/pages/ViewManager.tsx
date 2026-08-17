@@ -1,6 +1,7 @@
 import { createSignal, For, Show } from 'solid-js';
 import { createStore } from 'solid-js/store';
-import { api, TableView, ViewField, SchemaField } from '../api/client';
+import { api } from '../api/client';
+import { TableView, ViewField, SchemaField } from '../types/collection';
 
 interface ViewManagerProps {
   collectionName: string;

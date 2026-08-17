@@ -1,24 +1,10 @@
 import { createSignal, For, Show, onMount } from 'solid-js';
 import { createStore, produce } from 'solid-js/store';
 import { useParams, useNavigate } from '@solidjs/router';
-import { api, Collection, FieldType } from '../../api/client';
+import { api } from '../../api/client';
 import NameTransformer from '../../utils/nameTransformer';
-
-interface Field {
-  name: string;
-  type: FieldType;
-  required: boolean;
-  select_options?: string[];
-  select_options_text?: string;
-  order?: number;
-  table_fields?: Field[];
-}
-
-interface SectionState {
-  name: string;
-  collapsed: boolean;
-  fields: Field[];
-}
+import { Collection, Field, SectionState } from '../../types/collection';
+import { SchemaSectionEditor } from './collection-schema-section';
 
 export function CollectionEditor() {
   const params = useParams();
@@ -124,9 +110,6 @@ export function CollectionEditor() {
     setSections(produce((s) => s.splice(index, 1)));
   };
 
-  const toggleSection = (index: number) => {
-    setSections(index, 'collapsed', !sections[index].collapsed);
-  };
 
   const moveSectionUp = (index: number) => {
     if (index === 0) return;
@@ -189,27 +172,6 @@ export function CollectionEditor() {
     // Auto-expand the table field editor to show the converted columns
     setEditingTableField({ sectionIndex: null, fieldIndex: newFieldIndex });
   };
-
-  // Field management for unsectioned fields
-  const addUnsectionedField = () => {
-    setUnsectionedFields(produce((f) => f.push({ name: '', type: 'TEXT', required: false })));
-  };
-
-  const removeUnsectionedField = (index: number) => {
-    if (isEditMode() && collection()) {
-      const fieldName = unsectionedFields[index].name;
-      const existingField = collection()!.fields.find((f) => f.name === fieldName);
-      if (existingField) {
-        setShowRemovalWarning(true);
-      }
-    }
-    setUnsectionedFields(produce((f) => f.splice(index, 1)));
-  };
-
-  const updateUnsectionedField = (index: number, key: keyof Field, value: unknown) => {
-    setUnsectionedFields(index, key, value as never);
-  };
-
   // Field management for section fields
   const addSectionField = (sectionIndex: number) => {
     setSections(sectionIndex, 'fields', produce((f) => f.push({ name: '', type: 'TEXT', required: false })));
@@ -282,13 +244,6 @@ export function CollectionEditor() {
     return editing && editing.sectionIndex === sectionIndex && editing.fieldIndex === fieldIndex;
   };
 
-  const toggleTableFieldEditor = (sectionIndex: number | null, fieldIndex: number) => {
-    if (isEditingTableField(sectionIndex, fieldIndex)) {
-      setEditingTableField(null);
-    } else {
-      setEditingTableField({ sectionIndex, fieldIndex });
-    }
-  };
 
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
@@ -402,132 +357,6 @@ export function CollectionEditor() {
     navigate(isEditMode() ? `/collection/${params.name}` : '/');
   };
 
-  // Render a single field row
-  const renderFieldRow = (
-    field: Field,
-    fieldIndex: number,
-    sectionIndex: number | null,
-    onUpdate: (key: keyof Field, value: unknown) => void,
-    onRemove: () => void,
-    canRemove: boolean,
-    isTableField: boolean = false
-  ) => {
-    const fieldTypes: FieldType[] = isTableField
-      ? ['TEXT', 'NUMBER', 'BOOL', 'EMAIL', 'URL', 'DATE', 'SELECT', 'JSON']
-      : ['TEXT', 'NUMBER', 'BOOL', 'EMAIL', 'URL', 'DATE', 'SELECT', 'JSON', 'TABLE'];
-
-    return (
-      <div class={`field-row ${isTableField ? 'table-field-row' : ''}`}>
-        <div class="field-inputs">
-          <input
-            type="text"
-            placeholder="Field name"
-            value={field.name}
-            onInput={(e) => onUpdate('name', NameTransformer(e.currentTarget.value))}
-            class="field-name-input"
-          />
-          <select
-            value={field.type}
-            onChange={(e) => {
-              const newType = e.currentTarget.value as FieldType;
-              onUpdate('type', newType);
-              if (newType === 'TABLE' && (!field.table_fields || field.table_fields.length === 0)) {
-                onUpdate('table_fields', [{ name: '', type: 'TEXT', required: false }]);
-              }
-            }}
-            class="field-type-select"
-          >
-            <For each={fieldTypes}>
-              {(type) => <option value={type}>{type}</option>}
-            </For>
-          </select>
-
-          <Show when={field.type === 'SELECT'}>
-            <input
-              type="text"
-              placeholder="Options (comma-separated)"
-              value={field.select_options_text ?? ''}
-              onInput={(e) => onUpdate('select_options_text', e.currentTarget.value)}
-              onBlur={(e) => {
-                const options = e.currentTarget.value.split(',').map(s => s.trim()).filter(Boolean);
-                onUpdate('select_options', options);
-              }}
-              class="field-options-input"
-            />
-          </Show>
-
-          <label class="checkbox-label">
-            <input
-              type="checkbox"
-              checked={field.required}
-              onChange={(e) => onUpdate('required', e.currentTarget.checked)}
-            />
-            Required
-          </label>
-        </div>
-
-        <Show when={!isTableField && field.type === 'TABLE'}>
-          <button
-            type="button"
-            class="btn btn-sm"
-            onClick={() => toggleTableFieldEditor(sectionIndex, fieldIndex)}
-          >
-            {isEditingTableField(sectionIndex, fieldIndex) ? 'Hide Columns' : 'Edit Columns'}
-          </button>
-        </Show>
-
-        <button
-          type="button"
-          class="btn btn-icon btn-danger"
-          onClick={onRemove}
-          disabled={!canRemove}
-          title="Remove field"
-        >
-          &times;
-        </button>
-      </div>
-    );
-  };
-
-  // Render TABLE field column editor
-  const renderTableFieldEditor = (field: Field, sectionIndex: number | null, fieldIndex: number) => {
-    if (!field || field.type !== 'TABLE') return null;
-
-    return (
-      <div class="table-field-editor">
-        <div class="table-field-header">
-          <h4>Columns for "{field.name || 'Unnamed Table'}"</h4>
-          <button type="button" class="btn btn-sm" onClick={() => addTableField(sectionIndex, fieldIndex)}>
-            + Add Column
-          </button>
-        </div>
-        <div class="table-fields-list">
-          <For each={field.table_fields || []}>
-            {(tableField, idx) => renderFieldRow(
-              tableField,
-              idx(),
-              sectionIndex,
-              (key, value) => updateTableField(sectionIndex, fieldIndex, idx(), key, value),
-              () => removeTableField(sectionIndex, fieldIndex, idx()),
-              (field.table_fields?.length || 0) > 1,
-              true
-            )}
-          </For>
-        </div>
-        <Show when={!field.table_fields || field.table_fields.length === 0}>
-          <p class="form-hint">No columns defined. Add at least one column.</p>
-        </Show>
-      </div>
-    );
-  };
-
-  const getTotalFieldCount = () => {
-    let count = unsectionedFields.filter(f => f.name.trim()).length;
-    sections.forEach(s => {
-      count += s.fields.filter(f => f.name.trim()).length;
-    });
-    return count;
-  };
 
   return (
     <div class="schema-builder">
@@ -573,109 +402,37 @@ export function CollectionEditor() {
           </div>
         </div>
 
-        {/* Unsectioned Fields */}
-        <div class="form-section">
-          <div class="section-header">
-            <h3>Fields</h3>
-            <button type="button" class="btn btn-sm" onClick={addUnsectionedField}>
-              + Add Field
-            </button>
-          </div>
-
-          <div class="fields-list">
-            <For each={unsectionedFields}>
-              {(field, index) => (
-                <>
-                  {renderFieldRow(
-                    field,
-                    index(),
-                    null,
-                    (key, value) => updateUnsectionedField(index(), key, value),
-                    () => removeUnsectionedField(index()),
-                    unsectionedFields.length > 1 || sections.length > 0 || getTotalFieldCount() > 1
-                  )}
-                  <Show when={isEditingTableField(null, index()) && field.type === 'TABLE'}>
-                    {renderTableFieldEditor(field, null, index())}
-                  </Show>
-                </>
-              )}
-            </For>
-          </div>
-
-          <Show when={unsectionedFields.length === 0 && sections.length === 0}>
-            <p class="form-hint empty-fields-hint">No fields defined. Add a field to get started.</p>
-          </Show>
-        </div>
 
         {/* Sections with Fields */}
         <For each={sections}>
-          {(section, sectionIndex) => (
-            <div class="form-section section-container">
-              <div class="section-header-row">
-                <div class="section-drag-controls">
-                  <button type="button" class="btn btn-icon btn-sm" onClick={() => moveSectionUp(sectionIndex())} disabled={sectionIndex() === 0} title="Move up">
-                    &#8593;
-                  </button>
-                  <button type="button" class="btn btn-icon btn-sm" onClick={() => moveSectionDown(sectionIndex())} disabled={sectionIndex() >= sections.length - 1} title="Move down">
-                    &#8595;
-                  </button>
-                </div>
-                <div class="section-title-row" onClick={() => toggleSection(sectionIndex())}>
-                  <span class="collapse-icon">{section.collapsed ? '▶' : '▼'}</span>
-                  <input
-                    type="text"
-                    value={section.name}
-                    onInput={(e) => updateSectionName(sectionIndex(), e.currentTarget.value)}
-                    onClick={(e) => e.stopPropagation()}
-                    class="section-name-input-inline"
-                    placeholder="Section name"
-                  />
-                  <span class="field-count">({section.fields.length} fields)</span>
-                </div>
-                <div class="section-actions">
-                  <label class="toggle-label" title="Convert section to a TABLE field">
-                    <input
-                      type="checkbox"
-                      checked={false}
-                      onChange={() => convertSectionToTable(sectionIndex())}
-                    />
-                    <span class="toggle-text">Table</span>
-                  </label>
-                  <button type="button" class="btn btn-sm" onClick={() => addSectionField(sectionIndex())}>
-                    + Add Field
-                  </button>
-                  <button type="button" class="btn btn-icon btn-danger btn-sm" onClick={() => removeSection(sectionIndex())} title="Remove section">
-                    &times;
-                  </button>
-                </div>
-              </div>
+          {
+            (section, sectionIndex) => (
+              <SchemaSectionEditor
+                sectionIndex={sectionIndex()}
+                section={section}
 
-              <Show when={!section.collapsed}>
-                <div class="section-fields">
-                  <For each={section.fields}>
-                    {(field, fieldIndex) => (
-                      <>
-                        {renderFieldRow(
-                          field,
-                          fieldIndex(),
-                          sectionIndex(),
-                          (key, value) => updateSectionField(sectionIndex(), fieldIndex(), key, value),
-                          () => removeSectionField(sectionIndex(), fieldIndex()),
-                          section.fields.length > 1 || getTotalFieldCount() > 1
-                        )}
-                        <Show when={isEditingTableField(sectionIndex(), fieldIndex()) && field.type === 'TABLE'}>
-                          {renderTableFieldEditor(field, sectionIndex(), fieldIndex())}
-                        </Show>
-                      </>
-                    )}
-                  </For>
-                  <Show when={section.fields.length === 0}>
-                    <p class="form-hint">No fields in this section.</p>
-                  </Show>
-                </div>
-              </Show>
-            </div>
-          )}
+                moveSectionUp={moveSectionUp}
+                moveSectionDown={moveSectionDown}
+
+                isFirst={sectionIndex() === 0}
+                isLast={sectionIndex() === sections.length - 1}
+
+                updateSectionName={updateSectionName}
+                convertSectionToTable={convertSectionToTable}
+                removeSection={removeSection}
+
+                isEditingTableField={isEditingTableField}
+
+                addSectionField={addSectionField}
+                removeSectionField={removeSectionField}
+                updateSectionField={updateSectionField}
+
+                removeTableField={removeTableField}
+                updateTableField={updateTableField}
+                addTableField={addTableField}
+              />
+            )
+          }
         </For>
 
         {/* Add Section Button */}

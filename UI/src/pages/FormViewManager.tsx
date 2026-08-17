@@ -1,6 +1,7 @@
 import { createSignal, For, Show } from 'solid-js';
 import { createStore } from 'solid-js/store';
-import { api, FormView, FormFieldConfig, SchemaField, ActionType, FieldWidth } from '../api/client';
+import { api } from '../api/client';
+import { FormView, FormFieldConfig, SchemaField, ActionType, FieldWidth } from '../types/collection';
 
 interface FormViewManagerProps {
   collectionName: string;

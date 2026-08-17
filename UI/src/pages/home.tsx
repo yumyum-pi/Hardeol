@@ -1,5 +1,6 @@
 import { createSignal, onMount } from "solid-js";
-import { Collection, api } from "../api/client";
+import { api } from "../api/client";
+import { Collection } from "../types/collection";
 import { CollectionList } from "./CollectionList";
 
 function HomePage() {

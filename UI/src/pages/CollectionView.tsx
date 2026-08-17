@@ -1,7 +1,8 @@
 import { createSignal, createEffect, For, Show, Switch, Match, onMount } from 'solid-js';
 import { createStore, produce } from 'solid-js/store';
 import { useParams, useNavigate, useSearchParams, A } from '@solidjs/router';
-import { api, Collection, SchemaField, TableView, Section, FieldType, FormView, FormFieldConfig, ValidationProfile, ValidationError } from '../api/client';
+import { api } from '../api/client';
+import { Collection, SchemaField, TableView, Section, FieldType, FormView, FormFieldConfig, ValidationProfile, ValidationError } from '../types/collection';
 import { ViewSelector } from './ViewSelector';
 import { ViewManager } from './ViewManager';
 import { FormViewSelector } from './FormViewSelector';
