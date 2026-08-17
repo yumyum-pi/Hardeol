@@ -1,4 +1,4 @@
-import { createSignal, For, Show } from "solid-js";
+import { For, Show } from "solid-js";
 import { Field, FieldType } from "../../types/collection";
 import NameTransformer from "../../utils/nameTransformer";
 
@@ -17,12 +17,12 @@ type SchemaEditorFieldProps = {
 // Render a single field row
 export const SchemaFieldEditor = (props: SchemaEditorFieldProps) => {
   const isTableField = props.field.type === 'TABLE';
-  const fieldTypes: FieldType[] = isTableField
+  const fieldTypes: FieldType[] = !isTableField && !props.isTableFolded
     ? ['TEXT', 'NUMBER', 'BOOL', 'EMAIL', 'URL', 'DATE', 'SELECT', 'JSON']
     : ['TEXT', 'NUMBER', 'BOOL', 'EMAIL', 'URL', 'DATE', 'SELECT', 'JSON', 'TABLE'];
 
   return (
-    <div class={`field-row ${isTableField ? 'table-field-row' : ''}`}>
+    <div class={`field-row`}>
       <div class="field-inputs">
         <input
           type="text"
@@ -71,7 +71,7 @@ export const SchemaFieldEditor = (props: SchemaEditorFieldProps) => {
         </label>
       </div>
 
-      <Show when={!isTableField && props.field.type === 'TABLE'}>
+      <Show when={isTableField && props.field.type === 'TABLE'}>
         <button
           type="button"
           class="btn btn-sm"

@@ -71,7 +71,7 @@ export const SchemaSectionEditor = (props: SchemaSectionEditorProps) => {
                 field={field}
                 onUpdate={(key: keyof Field, value: unknown) => props.updateSectionField(props.sectionIndex, fieldIndex(), key, value)}
                 onRemove={() => props.removeSectionField(props.sectionIndex, fieldIndex())}
-                isTableFolded={isTableFolded()}
+                isTableFolded={true}
                 toggleTableFolded={() => setIsTableFolded(v => !v)}
                 canRemove={true}
               />
