@@ -161,10 +161,7 @@ export function ViewManager(props: ViewManagerProps) {
   };
 
   return (
-    <div class="modal-overlay" onClick={props.onClose}>
-      <div class="modal view-manager-modal" onClick={(e) => e.stopPropagation()}>
-        <h3>Manage Views</h3>
-
+    <div class="view-manager-modal">
         <Show when={error()}>
           <div class="error-banner">{error()}</div>
         </Show>
@@ -285,7 +282,6 @@ export function ViewManager(props: ViewManagerProps) {
             </div>
           </form>
         </Show>
-      </div>
     </div>
   );
 }

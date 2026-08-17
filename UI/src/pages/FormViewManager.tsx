@@ -197,10 +197,7 @@ export function FormViewManager(props: FormViewManagerProps) {
   };
 
   return (
-    <div class="modal-overlay" onClick={props.onClose}>
-      <div class="modal form-view-manager-modal" onClick={(e) => e.stopPropagation()}>
-        <h3>Manage Form Views</h3>
-
+    <div class="form-view-manager-modal">
         <Show when={error()}>
           <div class="error-banner">{error()}</div>
         </Show>
@@ -408,7 +405,6 @@ export function FormViewManager(props: FormViewManagerProps) {
             </div>
           </form>
         </Show>
-      </div>
     </div>
   );
 }

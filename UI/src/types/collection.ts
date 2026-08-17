@@ -15,6 +15,8 @@ export interface SectionState {
   fields: Field[];
 }
 
+export type FormActionType = 'CREATE' | 'UPDATE';
+
 export type FieldType = 'TEXT' | 'NUMBER' | 'BOOL' | 'EMAIL' | 'URL' | 'DATE' | 'SELECT' | 'JSON' | 'TABLE';
 
 export interface SchemaField {
@@ -171,4 +173,11 @@ export interface ValidationError {
   rule_type: 'field' | 'section' | 'collection';
   message: string;
   code: string;
+}
+
+export interface LineItem {
+  id?: number;
+  parent_id?: number;
+  row_order?: number;
+  [key: string]: unknown;
 }

@@ -405,10 +405,7 @@ export function ValidationProfileManager(props: ValidationProfileManagerProps) {
   };
 
   return (
-    <div class="modal-overlay" onClick={props.onClose}>
-      <div class="modal validation-profile-manager-modal" onClick={(e) => e.stopPropagation()}>
-        <h3>Manage Validation Profiles</h3>
-
+    <div class="validation-profile-manager-modal">
         <Show when={error()}>
           <div class="error-banner">{error()}</div>
         </Show>
@@ -602,7 +599,6 @@ export function ValidationProfileManager(props: ValidationProfileManagerProps) {
             </div>
           </form>
         </Show>
-      </div>
     </div>
   );
 }
