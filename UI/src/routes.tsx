@@ -8,8 +8,8 @@ const AppRouter = () => (
   <Router root={Layout}>
     <Route path="/" component={HomePage} />
     <Route path="/collection/:name" component={CollectionView} />
-    <Route path="/new" component={CollectionEditor} />
-    <Route path="/collection/:name/edit" component={CollectionEditor} />
+    <Route path="/collection/new" component={CollectionEditor} />
+    <Route path="/collection/:name/edit-schema" component={CollectionEditor} />
   </Router>
 )
 

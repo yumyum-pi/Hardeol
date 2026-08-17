@@ -956,7 +956,7 @@ export function CollectionView() {
                     Manage Validation
                   </button>
                   <Show when={collection()}>
-                    <A href={`/collection/${name()}/edit`} class="dropdown-item">
+                    <A href={`/collection/${name()}/edit-schema`} class="dropdown-item">
                       Edit Schema
                     </A>
                   </Show>

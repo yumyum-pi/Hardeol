@@ -536,7 +536,7 @@ export function CollectionEditor() {
           <button class="btn btn-text" onClick={handleCancel}>
             &larr; Cancel
           </button>
-          <h2>{isEditMode() ? `Edit Collection: ${params.name}` : 'New Collection'}</h2>
+          <h2>{isEditMode() ? `Edit Collection Schema: ${params.name}` : 'New Collection Schema'}</h2>
         </div>
       </header>
 

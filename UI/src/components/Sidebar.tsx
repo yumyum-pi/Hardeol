@@ -1,6 +1,6 @@
 import { onMount, For } from 'solid-js';
 import { A, useLocation } from '@solidjs/router';
-import type { Collection } from '../App';
+import { Collection } from '../api/client';
 
 interface SidebarProps {
   collections: Collection[];
@@ -27,7 +27,7 @@ export function Sidebar(props: SidebarProps) {
         <div class="nav-section">
           <div class="nav-section-header">
             <span>Collections</span>
-            <A href="/new" class="btn-icon" title="New Collection">
+            <A href="/collection/new" class="btn-icon" title="New Collection">
               +
             </A>
           </div>
@@ -41,7 +41,7 @@ export function Sidebar(props: SidebarProps) {
                     class="nav-item"
                     classList={{
                       active: location.pathname === `/collection/${collection.name}` ||
-                              location.pathname.startsWith(`/collection/${collection.name}/`),
+                        location.pathname.startsWith(`/collection/${collection.name}/`),
                     }}
                   >
                     <span class="nav-icon">&#9776;</span>
