@@ -1,9 +1,9 @@
 import { Router, Route } from "@solidjs/router";
-import { CollectionEditor } from "./pages/collectionEditor";
-import { CollectionView } from "./pages/CollectionView";
 import Layout from "./layout";
 import HomePage from "./pages/home";
 import NotFound from "./pages/NotFound";
+import { CollectionView } from "./pages/collection/listing";
+import { CollectionEditor } from "./pages/collection/editor";
 
 const AppRouter = () => (
   <Router root={Layout}>

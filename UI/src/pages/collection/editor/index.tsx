@@ -1,9 +1,9 @@
 import { createSignal, For, Show, onMount } from 'solid-js';
 import { createStore, produce } from 'solid-js/store';
 import { useParams, useNavigate } from '@solidjs/router';
-import { api } from '../../api/client';
-import NameTransformer from '../../utils/nameTransformer';
-import { Collection, Field, SchemaField, SectionState } from '../../types/collection';
+import { api } from '../../../api/client';
+import NameTransformer from '../../../utils/nameTransformer';
+import { Collection, Field, SchemaField, SectionState } from '../../../types/collection';
 import { SchemaSectionEditor } from './collection-schema-section';
 
 export function CollectionEditor() {

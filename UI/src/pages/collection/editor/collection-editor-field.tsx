@@ -1,6 +1,6 @@
 import { For, Show } from "solid-js";
-import { Field, FieldType } from "../../types/collection";
-import NameTransformer from "../../utils/nameTransformer";
+import { Field, FieldType } from "../../../types/collection";
+import NameTransformer from "../../../utils/nameTransformer";
 
 type SchemaEditorFieldProps = {
   field: Field,

@@ -1,5 +1,5 @@
 import { For, Show } from "solid-js";
-import { Field } from "../../types/collection"
+import { Field, FieldKeys } from "../../../types/collection"
 import { SchemaFieldEditor } from "./collection-editor-field";
 
 type SchemaTableFieldEditorProps = {
@@ -7,7 +7,7 @@ type SchemaTableFieldEditorProps = {
   fieldIndex: number
 
   removeTableField(sectionIndex: number, fieldIndex: number, index: number): void;
-  updateTableField(sectionIndex: number, fieldIndex: number, index: number, key: keyof Field, value: unknown): void;
+  updateTableField(sectionIndex: number, fieldIndex: number, index: number, key: FieldKeys, value: unknown): void;
   addTableField(sectionIndex: number, fieldIndex: number): void;
 }
 export const SchemaTableFieldEditor = (props: SchemaTableFieldEditorProps) => {

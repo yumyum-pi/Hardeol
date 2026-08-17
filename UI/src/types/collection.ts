@@ -8,6 +8,7 @@ export interface Field {
   order?: number;
   table_fields?: Field[];
 }
+export type FieldKeys = keyof Field;
 
 export interface SectionState {
   name: string;

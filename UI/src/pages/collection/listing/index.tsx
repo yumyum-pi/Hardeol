@@ -1,14 +1,14 @@
 import { createSignal, createEffect, For, Show, Switch, Match, onMount } from 'solid-js';
 import { createStore, produce } from 'solid-js/store';
 import { useParams, useNavigate, useSearchParams, A } from '@solidjs/router';
-import { api } from '../api/client';
-import { Collection, SchemaField, TableView, Section, FieldType, FormView, FormFieldConfig, ValidationProfile, ValidationError } from '../types/collection';
-import { ViewSelector } from './ViewSelector';
-import { ViewManager } from './ViewManager';
-import { FormViewSelector } from './FormViewSelector';
-import { FormViewManager } from './FormViewManager';
-import { ValidationProfileManager } from './ValidationProfileManager';
-import { validateRecord, getFieldErrors, getCollectionErrors } from '../validation/validator';
+import { api } from '../../../api/client';
+import { Collection, SchemaField, TableView, Section, FieldType, FormView, FormFieldConfig, ValidationProfile, ValidationError } from '../../../types/collection';
+import { ViewSelector } from '../../ViewSelector';
+import { ViewManager } from '../../ViewManager';
+import { FormViewSelector } from '../../FormViewSelector';
+import { FormViewManager } from '../../FormViewManager';
+import { ValidationProfileManager } from '../../ValidationProfileManager';
+import { validateRecord, getFieldErrors, getCollectionErrors } from '../../../validation/validator';
 
 interface LineItem {
   id?: number;
@@ -404,6 +404,7 @@ export function CollectionView() {
 
   // Line item handlers
   const addLineItem = (fieldName: string, isNewRecord: boolean = false) => {
+    console.log('i was clicked')
     const field = getField(fieldName);
     if (!field || !field.table_fields) return;
 
@@ -555,7 +556,7 @@ export function CollectionView() {
   const renderLineItemsTable = (field: SchemaField, isNewRecord: boolean = false) => {
     if (!field.table_fields || field.table_fields.length === 0) return null;
 
-    const items = () => isNewRecord ? (newLineItems[field.name] || []) : (lineItems[field.name] || []);
+    const items = isNewRecord ? (newLineItems[field.name] || []) : (lineItems[field.name] || []);
 
     return (
       <div class="line-items-section">
@@ -575,7 +576,7 @@ export function CollectionView() {
             </tr>
           </thead>
           <tbody>
-            <For each={items()}>
+            <For each={items}>
               {(item, index) => (
                 <tr>
                   <For each={field.table_fields}>
@@ -641,7 +642,7 @@ export function CollectionView() {
                 </tr>
               )}
             </For>
-            <Show when={items().length === 0}>
+            <Show when={items.length === 0}>
               <tr>
                 <td colspan={field.table_fields.length + 1} class="add-line-item-row">
                   <button type="button" class="btn btn-sm" onClick={() => addLineItem(field.name, isNewRecord)}>

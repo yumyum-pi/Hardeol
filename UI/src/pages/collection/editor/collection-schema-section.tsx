@@ -1,5 +1,5 @@
 import { createSignal, For, Show } from "solid-js";
-import { Field, SectionState } from "../../types/collection";
+import { Field, SectionState } from "../../../types/collection";
 import { SchemaTableFieldEditor } from "./collection-schema-table";
 import { SchemaFieldEditor } from "./collection-editor-field";
 
