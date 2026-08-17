@@ -555,7 +555,7 @@ export function CollectionView() {
   const renderLineItemsTable = (field: SchemaField, isNewRecord: boolean = false) => {
     if (!field.table_fields || field.table_fields.length === 0) return null;
 
-    const items = isNewRecord ? (newLineItems[field.name] || []) : (lineItems[field.name] || []);
+    const items = () => isNewRecord ? (newLineItems[field.name] || []) : (lineItems[field.name] || []);
 
     return (
       <div class="line-items-section">
@@ -575,7 +575,7 @@ export function CollectionView() {
             </tr>
           </thead>
           <tbody>
-            <For each={items}>
+            <For each={items()}>
               {(item, index) => (
                 <tr>
                   <For each={field.table_fields}>
@@ -641,7 +641,7 @@ export function CollectionView() {
                 </tr>
               )}
             </For>
-            <Show when={items.length === 0}>
+            <Show when={items().length === 0}>
               <tr>
                 <td colspan={field.table_fields.length + 1} class="add-line-item-row">
                   <button type="button" class="btn btn-sm" onClick={() => addLineItem(field.name, isNewRecord)}>
