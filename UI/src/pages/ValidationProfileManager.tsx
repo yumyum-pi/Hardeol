@@ -1,7 +1,7 @@
 import { createSignal, For, Show } from 'solid-js';
 import { createStore } from 'solid-js/store';
+import { api } from '../api/client';
 import {
-  api,
   ValidationProfile,
   FieldRule,
   SectionRule,
@@ -9,7 +9,7 @@ import {
   SchemaField,
   Section,
   ActionType,
-} from '../api/client';
+} from '../types/collection';
 
 interface ValidationProfileManagerProps {
   collectionName: string;
@@ -405,10 +405,7 @@ export function ValidationProfileManager(props: ValidationProfileManagerProps) {
   };
 
   return (
-    <div class="modal-overlay" onClick={props.onClose}>
-      <div class="modal validation-profile-manager-modal" onClick={(e) => e.stopPropagation()}>
-        <h3>Manage Validation Profiles</h3>
-
+    <div class="validation-profile-manager-modal">
         <Show when={error()}>
           <div class="error-banner">{error()}</div>
         </Show>
@@ -602,7 +599,6 @@ export function ValidationProfileManager(props: ValidationProfileManagerProps) {
             </div>
           </form>
         </Show>
-      </div>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { onMount, For, Accessor } from 'solid-js';
 import { A } from '@solidjs/router';
-import type { Collection } from '../api/client';
+import type { Collection } from '../types/collection';
 
 interface CollectionListProps {
   collections: Accessor<Collection[]>;
@@ -16,7 +16,7 @@ export function CollectionList(props: CollectionListProps) {
     <div class="collection-list">
       <header class="page-header">
         <h2>Collections</h2>
-        <A href="/new" class="btn btn-primary">
+        <A href="/collection/new" class="btn btn-primary">
           + New Collection
         </A>
       </header>
@@ -25,7 +25,7 @@ export function CollectionList(props: CollectionListProps) {
         <For each={props.collections()} fallback={
           <div class="empty-state">
             <p>No collections yet</p>
-            <A href="/new" class="btn btn-primary">
+            <A href="/collection/new" class="btn btn-primary">
               Create your first collection
             </A>
           </div>
