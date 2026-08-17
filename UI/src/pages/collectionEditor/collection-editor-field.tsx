@@ -7,18 +7,22 @@ type SchemaEditorFieldProps = {
   onUpdate: (key: keyof Field, value: unknown) => void,
   onRemove: () => void,
   canRemove: boolean,
-  isTableField: boolean
+
+
+  isTableFolded: boolean;
+  toggleTableFolded?: () => void;
+
 }
 
 // Render a single field row
 export const SchemaFieldEditor = (props: SchemaEditorFieldProps) => {
-  const [isFolded, setIsFolded] = createSignal(true);
-  const fieldTypes: FieldType[] = props.isTableField
+  const isTableField = props.field.type === 'TABLE';
+  const fieldTypes: FieldType[] = isTableField
     ? ['TEXT', 'NUMBER', 'BOOL', 'EMAIL', 'URL', 'DATE', 'SELECT', 'JSON']
     : ['TEXT', 'NUMBER', 'BOOL', 'EMAIL', 'URL', 'DATE', 'SELECT', 'JSON', 'TABLE'];
 
   return (
-    <div class={`field-row ${props.isTableField ? 'table-field-row' : ''}`}>
+    <div class={`field-row ${isTableField ? 'table-field-row' : ''}`}>
       <div class="field-inputs">
         <input
           type="text"
@@ -67,13 +71,13 @@ export const SchemaFieldEditor = (props: SchemaEditorFieldProps) => {
         </label>
       </div>
 
-      <Show when={!props.isTableField && props.field.type === 'TABLE'}>
+      <Show when={!isTableField && props.field.type === 'TABLE'}>
         <button
           type="button"
           class="btn btn-sm"
-          onClick={() => setIsFolded(v => !v)}
+          onClick={props.toggleTableFolded}
         >
-          {isFolded() ? 'Hide Columns' : 'Edit Columns'}
+          {props.isTableFolded ? 'Hide Columns' : 'Edit Columns'}
         </button>
       </Show>
 

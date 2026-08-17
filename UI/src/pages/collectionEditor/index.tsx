@@ -129,49 +129,6 @@ export function CollectionEditor() {
     }));
   };
 
-  const convertSectionToTable = (sectionIndex: number) => {
-    const section = sections[sectionIndex];
-
-    // Validation: Section must have at least 1 field with a name
-    const validFields = section.fields.filter(f => f.name.trim());
-    if (validFields.length === 0) {
-      setError('Section must have at least one named field to convert to a table');
-      return;
-    }
-
-    // Validation: No field in the section can be of type TABLE (tables can't nest)
-    const hasNestedTable = validFields.some(f => f.type === 'TABLE');
-    if (hasNestedTable) {
-      setError('Cannot convert section containing TABLE fields (tables cannot be nested)');
-      return;
-    }
-
-    // Create TABLE field from section
-    const tableField: Field = {
-      name: NameTransformer(section.name),
-      type: 'TABLE',
-      required: false,
-      table_fields: validFields.map(f => ({
-        name: f.name,
-        type: f.type,
-        required: f.required,
-        select_options: f.select_options,
-        select_options_text: f.select_options_text,
-      })),
-    };
-
-    // Calculate the new field index before adding
-    const newFieldIndex = unsectionedFields.length;
-
-    // Add to unsectioned fields
-    setUnsectionedFields(produce(f => f.push(tableField)));
-
-    // Remove the section
-    setSections(produce(s => s.splice(sectionIndex, 1)));
-
-    // Auto-expand the table field editor to show the converted columns
-    setEditingTableField({ sectionIndex: null, fieldIndex: newFieldIndex });
-  };
   // Field management for section fields
   const addSectionField = (sectionIndex: number) => {
     setSections(sectionIndex, 'fields', produce((f) => f.push({ name: '', type: 'TEXT', required: false })));
@@ -402,8 +359,6 @@ export function CollectionEditor() {
           </div>
         </div>
 
-
-        {/* Sections with Fields */}
         <For each={sections}>
           {
             (section, sectionIndex) => (
@@ -418,10 +373,7 @@ export function CollectionEditor() {
                 isLast={sectionIndex() === sections.length - 1}
 
                 updateSectionName={updateSectionName}
-                convertSectionToTable={convertSectionToTable}
                 removeSection={removeSection}
-
-                isEditingTableField={isEditingTableField}
 
                 addSectionField={addSectionField}
                 removeSectionField={removeSectionField}
@@ -441,10 +393,6 @@ export function CollectionEditor() {
             + Add Section
           </button>
         </div>
-
-        <p class="form-hint">
-          An <code>id</code> field will be added automatically.
-        </p>
 
         <div class="form-actions">
           <button type="button" class="btn" onClick={handleCancel}>

@@ -14,10 +14,8 @@ type SchemaSectionEditorProps = {
   isLast: boolean
 
   updateSectionName: (index: number, name: string) => void;
-  convertSectionToTable: (index: number) => void,
   removeSection(sectionIndex: number): void;
 
-  isEditingTableField(arg0: any, arg1: number): unknown;
 
   addSectionField(sectionIndex: number): void;
   removeSectionField(arg0: any, arg1: number): unknown;
@@ -31,8 +29,9 @@ type SchemaSectionEditorProps = {
 
 export const SchemaSectionEditor = (props: SchemaSectionEditorProps) => {
   const [isFolded, setIsFolded] = createSignal(false);
+  const [isTableFolded, setIsTableFolded] = createSignal(false);
 
-  return <div class="form-section section-container">
+  return <div class="form-section">
     <div class="section-header-row">
       <div class="section-drag-controls">
         <button type="button" class="btn btn-icon btn-sm" onClick={() => props.moveSectionUp(props.sectionIndex)} disabled={props.isFirst} title="Move up">
@@ -54,13 +53,6 @@ export const SchemaSectionEditor = (props: SchemaSectionEditorProps) => {
         <span class="field-count">({props.section.fields.length} fields)</span>
       </div>
       <div class="section-actions">
-        <label class="toggle-label" title="Convert section to a TABLE field">
-          <input
-            type="checkbox"
-            checked={false}
-            onChange={() => props.convertSectionToTable(props.sectionIndex)} />
-          <span class="toggle-text">Table</span>
-        </label>
         <button type="button" class="btn btn-sm" onClick={() => props.addSectionField(props.sectionIndex)}>
           + Add Field
         </button>
@@ -79,14 +71,17 @@ export const SchemaSectionEditor = (props: SchemaSectionEditorProps) => {
                 field={field}
                 onUpdate={(key: keyof Field, value: unknown) => props.updateSectionField(props.sectionIndex, fieldIndex(), key, value)}
                 onRemove={() => props.removeSectionField(props.sectionIndex, fieldIndex())}
+                isTableFolded={isTableFolded()}
+                toggleTableFolded={() => setIsTableFolded(v => !v)}
                 canRemove={true}
-                isTableField={false} />
-              <Show when={props.isEditingTableField(props.sectionIndex, fieldIndex()) && field.type === 'TABLE'}>
+              />
+              <Show when={isTableFolded() && field.type === 'TABLE'}>
                 {
                   <SchemaTableFieldEditor
                     field={field}
                     sectionIndex={props.sectionIndex}
                     fieldIndex={fieldIndex()}
+                    isTableFolded={isTableFolded()}
 
                     removeTableField={props.removeTableField}
                     updateTableField={props.updateTableField}
