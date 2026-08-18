@@ -75,7 +75,7 @@ export function CollectionEditor() {
         // Set sections with their fields; merge any orphaned (unsectioned) fields
         // into the first section, creating one if the collection has none.
         if (sortedSections.length === 0 && unsectioned.length > 0) {
-          setSections([{ name: 'Section 1', fields: unsectioned }]);
+          setSections([{ name: 'section_1', fields: unsectioned }]);
         } else {
           setSections(sortedSections.map((s, idx) => ({
             name: s.name,
@@ -93,13 +93,14 @@ export function CollectionEditor() {
   // Section management
   const addSection = () => {
     setSections(produce((s) => s.push({
-      name: `Section ${s.length + 1}`,
+      name: `section_${s.length + 1}`,
       fields: [{ name: '', type: 'TEXT', required: false }]
     })));
   };
 
   const updateSectionName = (index: number, name: string) => {
-    setSections(index, 'name', name);
+    const newName = NameTransformer(name)
+    setSections(index, 'name', newName);
   };
 
   const removeSection = (index: number) => {

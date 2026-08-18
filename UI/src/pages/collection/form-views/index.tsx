@@ -3,7 +3,7 @@ import { useParams, useNavigate } from '@solidjs/router';
 import { api } from '../../../api/client';
 import { useCollectionData } from '../../../hooks/useCollectionData';
 import { FormView } from '../../../types/collection';
-import { FormViewManager } from '../../FormViewManager';
+import { FormViewManager } from './FormViewManager';
 
 export function FormViewsPage() {
   const params = useParams();

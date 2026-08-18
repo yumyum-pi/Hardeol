@@ -23,13 +23,6 @@ export const SchemaFieldEditor = (props: SchemaEditorFieldProps) => {
   return (
     <div class={`field-row`}>
       <div class="field-inputs">
-        <input
-          type="text"
-          placeholder="Field name"
-          value={props.field.name}
-          onInput={(e) => props.onUpdate('name', NameTransformer(e.currentTarget.value))}
-          class="field-name-input"
-        />
         <select
           value={props.field.type}
           onChange={(e) => {
@@ -45,6 +38,13 @@ export const SchemaFieldEditor = (props: SchemaEditorFieldProps) => {
             {(type) => <option value={type}>{type}</option>}
           </For>
         </select>
+        <input
+          type="text"
+          placeholder="Field name"
+          value={props.field.name}
+          onInput={(e) => props.onUpdate('name', NameTransformer(e.currentTarget.value))}
+          class="field-name-input"
+        />
 
         <Show when={props.field.type === 'SELECT'}>
           <input
