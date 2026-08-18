@@ -3,7 +3,7 @@ import { useParams, useNavigate } from '@solidjs/router';
 import { api } from '../../../api/client';
 import { useCollectionData } from '../../../hooks/useCollectionData';
 import { TableView } from '../../../types/collection';
-import { ViewManager } from '../../ViewManager';
+import { TableViewManager } from './table-view-manager';
 
 export function TableViewsPage() {
   const params = useParams();
@@ -39,7 +39,7 @@ export function TableViewsPage() {
       </header>
 
       <Show when={!loading() && collection()}>
-        <ViewManager
+        <TableViewManager
           collectionName={name()}
           schemaFields={collection()!.fields}
           views={views()}

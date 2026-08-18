@@ -1,7 +1,8 @@
 import { createSignal, For, Show } from 'solid-js';
 import { createStore } from 'solid-js/store';
-import { api } from '../api/client';
-import { TableView, ViewField, SchemaField } from '../types/collection';
+import { api } from '../../../api/client';
+import { SchemaField, TableView, ViewField } from '../../../types/collection';
+import "./table-view.css";
 
 interface ViewManagerProps {
   collectionName: string;
@@ -11,7 +12,7 @@ interface ViewManagerProps {
   onViewsChanged: () => void;
 }
 
-export function ViewManager(props: ViewManagerProps) {
+export function TableViewManager(props: ViewManagerProps) {
   const [editingView, setEditingView] = createSignal<TableView | null>(null);
   const [isCreating, setIsCreating] = createSignal(false);
   const [viewName, setViewName] = createSignal('');
@@ -161,127 +162,135 @@ export function ViewManager(props: ViewManagerProps) {
   };
 
   return (
-    <div class="view-manager-modal">
+    <div class="split-view">
+      <div class="view-manager-modal card non-click height-full">
         <Show when={error()}>
           <div class="error-banner">{error()}</div>
         </Show>
 
-        <Show when={!isCreating() && !editingView()}>
-          <div class="view-list">
-            <Show when={props.views.length === 0}>
-              <p class="empty-text">No saved views yet</p>
-            </Show>
-            <For each={props.views}>
-              {(view) => (
-                <div class="view-item">
-                  <span class="view-name">
-                    {view.name}
-                    <Show when={view.is_default}>
-                      <span class="default-badge">Default</span>
-                    </Show>
-                  </span>
-                  <span class="view-field-count">{view.fields.length} fields</span>
-                  <div class="view-actions">
-                    <button class="btn btn-sm" onClick={() => openEdit(view)}>
-                      Edit
-                    </button>
-                    <button class="btn btn-danger btn-sm" onClick={() => handleDelete(view)}>
-                      Delete
-                    </button>
-                  </div>
+        <div class="view-list">
+          <Show when={props.views.length === 0}>
+            <p class="empty-text">No saved views yet</p>
+          </Show>
+          <For each={props.views}>
+            {(view) => (
+              <div class="view-item">
+                <span class="view-name">
+                  {view.name}
+                  <Show when={view.is_default}>
+                    <span class="default-badge">Default</span>
+                  </Show>
+                </span>
+                <span class="view-field-count">{view.fields.length} fields</span>
+                <div class="view-actions">
+                  <button class="btn btn-sm" onClick={() => openEdit(view)}>
+                    Edit
+                  </button>
+                  <button class="btn btn-danger btn-sm" onClick={() => handleDelete(view)}>
+                    Delete
+                  </button>
                 </div>
-              )}
-            </For>
+              </div>
+            )}
+          </For>
+        </div>
+
+        <div class="form-actions">
+          <button class="btn btn-primary" onClick={openCreate}>
+            + New View
+          </button>
+        </div>
+      </div>
+      <Show when={isCreating() || editingView()}>
+        <form class="card non-click height-full" onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
+          <div class="form-group">
+            <label>View Name</label>
+            <input
+              type="text"
+              value={viewName()}
+              onInput={(e) => setViewName(e.currentTarget.value)}
+              placeholder="e.g., Summary View"
+            />
+          </div>
+
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input
+                type="checkbox"
+                checked={isDefault()}
+                onChange={(e) => setIsDefault(e.currentTarget.checked)}
+              />
+              Set as default view
+            </label>
+          </div>
+
+          <div class="form-group">
+            <label>Fields</label>
+            <div class="field-selector">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Show</th>
+                    <th>Field</th>
+                    <th>Class</th>
+                    <th>Arrange</th>
+                  </tr></thead>
+                <tbody>
+                  <For each={sortedAvailableFields()}>
+                    {(field, index) => (
+                      <tr >
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={selectedFields[field.name]?.selected ?? false}
+                            onChange={(e) => setSelectedFields(field.name, 'selected', e.currentTarget.checked)}
+                          />
+                        </td>
+                        <td>{field.name}</td>
+                        <td>
+                          <input
+                            type="text"
+                            class="css-class-input"
+                            placeholder="CSS class"
+                            value={selectedFields[field.name]?.cssClass ?? ''}
+                            onInput={(e) => setSelectedFields(field.name, 'cssClass', e.currentTarget.value)}
+                          />
+                        </td>
+                        <td class="order-buttons">
+                          <button
+                            type="button"
+                            class="btn btn-xs"
+                            disabled={index() === 0}
+                            onClick={() => moveField(field.name, 'up')}
+                          >
+                            ↑
+                          </button>
+                          <button
+                            type="button"
+                            class="btn btn-xs"
+                            disabled={index() === sortedAvailableFields().length - 1}
+                            onClick={() => moveField(field.name, 'down')}
+                          >
+                            ↓
+                          </button>
+                        </td>
+                      </tr>
+                    )}
+                  </For></tbody>
+              </table>
+            </div>
           </div>
 
           <div class="form-actions">
-            <button class="btn" onClick={props.onClose}>
-              Close
+            <button type="button" class="btn" onClick={closeForm}>
+              Cancel
             </button>
-            <button class="btn btn-primary" onClick={openCreate}>
-              + New View
+            <button type="submit" class="btn btn-primary">
+              {isCreating() ? 'Create View' : 'Save Changes'}
             </button>
           </div>
-        </Show>
-
-        <Show when={isCreating() || editingView()}>
-          <form onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
-            <div class="form-group">
-              <label>View Name</label>
-              <input
-                type="text"
-                value={viewName()}
-                onInput={(e) => setViewName(e.currentTarget.value)}
-                placeholder="e.g., Summary View"
-              />
-            </div>
-
-            <div class="form-group">
-              <label class="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={isDefault()}
-                  onChange={(e) => setIsDefault(e.currentTarget.checked)}
-                />
-                Set as default view
-              </label>
-            </div>
-
-            <div class="form-group">
-              <label>Fields</label>
-              <div class="field-selector">
-                <For each={sortedAvailableFields()}>
-                  {(field, index) => (
-                    <div class="field-row">
-                      <label class="checkbox-label">
-                        <input
-                          type="checkbox"
-                          checked={selectedFields[field.name]?.selected ?? false}
-                          onChange={(e) => setSelectedFields(field.name, 'selected', e.currentTarget.checked)}
-                        />
-                        {field.name}
-                      </label>
-                      <input
-                        type="text"
-                        class="css-class-input"
-                        placeholder="CSS class"
-                        value={selectedFields[field.name]?.cssClass ?? ''}
-                        onInput={(e) => setSelectedFields(field.name, 'cssClass', e.currentTarget.value)}
-                      />
-                      <div class="order-buttons">
-                        <button
-                          type="button"
-                          class="btn btn-xs"
-                          disabled={index() === 0}
-                          onClick={() => moveField(field.name, 'up')}
-                        >
-                          ↑
-                        </button>
-                        <button
-                          type="button"
-                          class="btn btn-xs"
-                          disabled={index() === sortedAvailableFields().length - 1}
-                          onClick={() => moveField(field.name, 'down')}
-                        >
-                          ↓
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </For>
-              </div>
-            </div>
-
-            <div class="form-actions">
-              <button type="button" class="btn" onClick={closeForm}>
-                Cancel
-              </button>
-              <button type="submit" class="btn btn-primary">
-                {isCreating() ? 'Create View' : 'Save Changes'}
-              </button>
-            </div>
-          </form>
-        </Show>
+        </form>
+      </Show>
     </div>
   );
 }

@@ -1,0 +1,115 @@
+
+:root {
+  --default-font-size: 14px;
+}
+:root,
+body {
+  line-height: 1.5;
+  font-size: var(--default-font-size);
+  font-weight: 400;
+  --placeholder-color: color-mix(in oklch, currentColor 50%, #0000);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  line-height: 1.5;
+  --default-font-size: 14px;
+  font-family: "IBM Plex Sans", sans-serif;
+  font-size: var(--default-font-size);
+  font-weight: 400;
+}
+
+a {
+  color: inherit;
+  text-decoration: inherit;
+}
+
+table {
+  text-indent: 0;
+  border-color: inherit;
+  border-collapse: collapse;
+}
+
+::file-selector-button,
+button,
+input,
+optgroup,
+select,
+textarea {
+  font: inherit;
+  font-feature-settings: inherit;
+  font-variation-settings: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  background: 0;
+}
+
+input:where(:not([type="button"], [type="reset"], [type="submit"])),
+select,
+textarea {
+  border-width: 1px;
+  border-radius: 8px;
+}
+
+::file-selector-button,
+button,
+input:where([type="button"], [type="reset"], [type="submit"]) {
+  appearance: button;
+  border-radius: 8px;
+}
+:-moz-focusring {
+  outline: auto;
+}
+:-moz-ui-invalid {
+  box-shadow: none;
+}
+::-webkit-search-decoration {
+  -webkit-appearance: none;
+}
+
+menu,
+ol,
+ul {
+  list-style: none;
+}
+
+textarea {
+  resize: vertical;
+}
+
+::placeholder {
+  opacity: 1;
+  color: var(--placeholder-color);
+}
+
+audio,
+canvas,
+embed,
+iframe,
+img,
+object,
+svg,
+video {
+  display: block;
+}
+
+img,
+video {
+  max-width: 100%;
+  height: auto;
+}
+
+*,
+::after,
+::backdrop,
+::before,
+::file-selector-button {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
