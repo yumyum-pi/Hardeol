@@ -1,6 +1,42 @@
-import { createEffect, createMemo, createSignal, For, JSXElement } from "solid-js";
+import { createEffect, createMemo, createSignal, For, JSXElement, Show } from "solid-js";
 import { Collection, SchemaField, TableView } from "../types/collection";
-import { TableViewSelector } from "./table-view-selector";
+
+interface TableViewSelectorProps {
+  views: TableView[];
+  selectedViewId: number | null;
+  onSelect: (viewId: number | null) => void;
+  onManage?: () => void;
+}
+
+export function TableViewSelector(props: TableViewSelectorProps) {
+  return (
+    <div class="view-selector">
+      <select
+        class="view-select"
+        value={props.selectedViewId ?? ''}
+        onChange={(e) => {
+          const val = e.currentTarget.value;
+          props.onSelect(val === '' ? null : Number(val));
+        }}
+      >
+        <option value="">All Fields</option>
+        <For each={props.views}>
+          {(view) => (
+            <option value={view.id}>
+              {view.name}
+              {view.is_default ? ' (Default)' : ''}
+            </option>
+          )}
+        </For>
+      </select>
+      <Show when={props.onManage}>
+        <button class="btn btn-sm" onClick={props.onManage}>
+          Manage Views
+        </button>
+      </Show>
+    </div>
+  );
+}
 
 type CollectionTableViewProps = {
   views: TableView[];
