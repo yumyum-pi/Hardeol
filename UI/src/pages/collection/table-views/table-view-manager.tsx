@@ -21,7 +21,7 @@ export function TableViewManager(props: ViewManagerProps) {
   const [error, setError] = createSignal<string | null>(null);
 
   // Available fields (excluding 'id' since it's always included)
-  const availableFields = () => props.schemaFields.filter(f => f.name !== 'id');
+  const availableFields = () => props.schemaFields.filter(f => f.type !== 'TABLE');
 
   const initializeFieldsForEdit = (view: TableView) => {
     // Reset all fields

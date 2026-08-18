@@ -400,8 +400,8 @@ display: inline-flex;
 }
 
 .data-table tr:last-child > td {
-  height: calc(var(--row-height) + 8px);
-  padding-bottom: 1rem;
+  height: calc(var(--row-height) + 1rem);
+  padding-bottom: 1.5rem;
 }
 
 .actions-col {
