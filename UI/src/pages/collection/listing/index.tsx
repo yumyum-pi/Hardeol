@@ -2,8 +2,9 @@ import { createSignal, createEffect, createMemo, For, Show, onMount } from 'soli
 import { useParams, useSearchParams, A } from '@solidjs/router';
 import { api } from '../../../api/client';
 import { TableView } from '../../../types/collection';
-import { ViewSelector } from '../../ViewSelector';
 import { useCollectionData } from '../../../hooks/useCollectionData';
+import Header from '../../../components/header';
+import { TableViewSelector } from '../../../components/table-view-selector';
 
 export function CollectionView() {
   const params = useParams();
@@ -125,48 +126,42 @@ export function CollectionView() {
   return (
     <div class="collection-view">
       <Show when={isCollection()} fallback={NoCollectionView()}>
-        <header class="page-header">
-          <div class="header-left">
-            <A href="/" class="btn btn-text">
-              {"back"}
-            </A>
-            <h2>{name()}</h2>
+        <Header
+          back={true}
+          title={name()}
+        >
+          <TableViewSelector
+            views={views()}
+            selectedViewId={selectedViewId()}
+            onSelect={handleViewSelect}
+          />
+          <div class="dropdown">
+            <button class="btn" onClick={() => setShowOptionsMenu(!showOptionsMenu())}>
+              Options
+            </button>
+            <Show when={showOptionsMenu()}>
+              <div class="dropdown-menu" onClick={() => setShowOptionsMenu(false)}>
+                <A href={`/collection/${name()}/table-views`} class="dropdown-item">
+                  Manage Table Views
+                </A>
+                <A href={`/collection/${name()}/form-views`} class="dropdown-item">
+                  Manage Form Views
+                </A>
+                <A href={`/collection/${name()}/manage-validation`} class="dropdown-item">
+                  Manage Validation
+                </A>
+                <Show when={collection()}>
+                  <A href={`/collection/${name()}/edit-schema`} class="dropdown-item">
+                    Edit Schema
+                  </A>
+                </Show>
+              </div>
+            </Show>
           </div>
-          <div class="header-actions">
-            <ViewSelector
-              views={views()}
-              selectedViewId={selectedViewId()}
-              onSelect={handleViewSelect}
-            />
-            <div class="dropdown">
-              <button class="btn" onClick={() => setShowOptionsMenu(!showOptionsMenu())}>
-                Options
-              </button>
-              <Show when={showOptionsMenu()}>
-                <div class="dropdown-menu" onClick={() => setShowOptionsMenu(false)}>
-                  <A href={`/collection/${name()}/table-views`} class="dropdown-item">
-                    Manage Table Views
-                  </A>
-                  <A href={`/collection/${name()}/form-views`} class="dropdown-item">
-                    Manage Form Views
-                  </A>
-                  <A href={`/collection/${name()}/manage-validation`} class="dropdown-item">
-                    Manage Validation
-                  </A>
-                  <Show when={collection()}>
-                    <A href={`/collection/${name()}/edit-schema`} class="dropdown-item">
-                      Edit Schema
-                    </A>
-                  </Show>
-                </div>
-              </Show>
-            </div>
-            <A href={`/collection/${name()}/records/new`} class="btn btn-primary">
-              + Add Record
-            </A>
-          </div>
-        </header>
-
+          <A href={`/collection/${name()}/records/new`} class="btn btn-primary">
+            + Add Record
+          </A>
+        </Header>
         <Show when={error()}>
           <div class="error-banner">{error()}</div>
         </Show>

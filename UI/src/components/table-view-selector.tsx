@@ -1,14 +1,14 @@
 import { For, Show } from 'solid-js';
 import { TableView } from '../types/collection';
 
-interface ViewSelectorProps {
+interface TableViewSelectorProps {
   views: TableView[];
   selectedViewId: number | null;
   onSelect: (viewId: number | null) => void;
   onManage?: () => void;
 }
 
-export function ViewSelector(props: ViewSelectorProps) {
+export function TableViewSelector(props: TableViewSelectorProps) {
   return (
     <div class="view-selector">
       <select

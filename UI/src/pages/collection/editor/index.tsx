@@ -5,6 +5,7 @@ import { api } from '../../../api/client';
 import NameTransformer from '../../../utils/nameTransformer';
 import { Collection, Field, SchemaField, SectionState } from '../../../types/collection';
 import { SchemaSectionEditor } from './collection-schema-section';
+import Header from '../../../components/header';
 
 export function CollectionEditor() {
   const params = useParams();
@@ -285,14 +286,10 @@ export function CollectionEditor() {
 
   return (
     <div class="schema-builder">
-      <header class="page-header">
-        <div class="header-left">
-          <button class="btn btn-text" onClick={handleCancel}>
-            &larr; Cancel
-          </button>
-          <h2>{isEditMode() ? `Edit Collection Schema: ${params.name}` : 'New Collection Schema'}</h2>
-        </div>
-      </header>
+      <Header
+        back={true}
+        title={isEditMode() ? `Edit Collection Schema: ${params.name}` : 'New Collection Schema'}
+      />
 
       <Show when={error()}>
         <div class="error-banner">{error()}</div>

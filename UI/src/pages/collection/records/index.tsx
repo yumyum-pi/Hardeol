@@ -7,6 +7,7 @@ import { FormView, LineItem, SchemaField, ValidationError, ValidationProfile } f
 import { validateRecord, getCollectionErrors } from '../../../validation/validator';
 import { FormViewSelector } from '../../FormViewSelector';
 import { FormFields } from './formFields';
+import Header from '../../../components/header';
 
 type ActionType = 'CREATE' | 'UPDATE';
 
@@ -227,21 +228,17 @@ export function RecordFormPage() {
 
   return (
     <div class="record-form-page">
-      <header class="page-header">
-        <div class="header-left">
-          <button class="btn btn-text" onClick={handleCancel}>
-            &larr; Cancel
-          </button>
-          <h2>{isEditMode() ? `Edit Record (ID: ${params.id})` : `Add Record: ${name()}`}</h2>
-        </div>
-        <div class="header-actions">
-          <FormViewSelector
-            views={getFormViewsForAction(actionType())}
-            selectedViewId={selectedViewId()}
-            onSelect={setSelectedViewId}
-          />
-        </div>
-      </header>
+      <Header
+        back={true}
+        title={isEditMode() ? `Edit Record (ID: ${params.id})` : `Add Record: ${name()}`}
+      >
+
+        <FormViewSelector
+          views={getFormViewsForAction(actionType())}
+          selectedViewId={selectedViewId()}
+          onSelect={setSelectedViewId}
+        />
+      </Header>
 
       <Show when={error()}>
         <div class="error-banner">{error()}</div>
