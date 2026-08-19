@@ -3,7 +3,8 @@ import { useParams, useNavigate } from '@solidjs/router';
 import { api } from '../../../api/client';
 import { useCollectionData } from '../../../hooks/useCollectionData';
 import { FormView } from '../../../types/collection';
-import { FormViewManager } from '../../FormViewManager';
+import { FormViewManager } from './FormViewManager';
+import Header from '../../../components/header';
 
 export function FormViewsPage() {
   const params = useParams();
@@ -29,14 +30,10 @@ export function FormViewsPage() {
 
   return (
     <div class="form-views-page">
-      <header class="page-header">
-        <div class="header-left">
-          <button class="btn btn-text" onClick={handleBack}>
-            &larr; Back
-          </button>
-          <h2>Manage Form Views: {name()}</h2>
-        </div>
-      </header>
+      <Header
+        back={true}
+        title={`Manage Form Views: ${name()}`}
+      />
 
       <Show when={!loading() && collection()}>
         <FormViewManager

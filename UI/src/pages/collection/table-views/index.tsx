@@ -3,7 +3,8 @@ import { useParams, useNavigate } from '@solidjs/router';
 import { api } from '../../../api/client';
 import { useCollectionData } from '../../../hooks/useCollectionData';
 import { TableView } from '../../../types/collection';
-import { ViewManager } from '../../ViewManager';
+import { TableViewManager } from './table-view-manager';
+import Header from '../../../components/header';
 
 export function TableViewsPage() {
   const params = useParams();
@@ -29,17 +30,13 @@ export function TableViewsPage() {
 
   return (
     <div class="table-views-page">
-      <header class="page-header">
-        <div class="header-left">
-          <button class="btn btn-text" onClick={handleBack}>
-            &larr; Back
-          </button>
-          <h2>Manage Table Views: {name()}</h2>
-        </div>
-      </header>
-
+      <Header
+        back={true}
+        title={`Manage Table Views: ${name()}`}
+      >
+      </Header>
       <Show when={!loading() && collection()}>
-        <ViewManager
+        <TableViewManager
           collectionName={name()}
           schemaFields={collection()!.fields}
           views={views()}

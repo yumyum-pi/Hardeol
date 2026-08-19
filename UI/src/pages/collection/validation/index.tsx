@@ -4,6 +4,7 @@ import { api } from '../../../api/client';
 import { useCollectionData } from '../../../hooks/useCollectionData';
 import { ValidationProfile } from '../../../types/collection';
 import { ValidationProfileManager } from '../../ValidationProfileManager';
+import Header from '../../../components/header';
 
 export function ValidationPage() {
   const params = useParams();
@@ -29,14 +30,10 @@ export function ValidationPage() {
 
   return (
     <div class="validation-page">
-      <header class="page-header">
-        <div class="header-left">
-          <button class="btn btn-text" onClick={handleBack}>
-            &larr; Back
-          </button>
-          <h2>Manage Validation: {name()}</h2>
-        </div>
-      </header>
+      <Header
+        back={true}
+        title={`Manage Validation: ${name()}`}
+      />
 
       <Show when={!loading() && collection()}>
         <ValidationProfileManager

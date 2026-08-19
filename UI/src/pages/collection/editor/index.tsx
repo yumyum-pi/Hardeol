@@ -5,6 +5,7 @@ import { api } from '../../../api/client';
 import NameTransformer from '../../../utils/nameTransformer';
 import { Collection, Field, SchemaField, SectionState } from '../../../types/collection';
 import { SchemaSectionEditor } from './collection-schema-section';
+import Header from '../../../components/header';
 
 export function CollectionEditor() {
   const params = useParams();
@@ -75,7 +76,7 @@ export function CollectionEditor() {
         // Set sections with their fields; merge any orphaned (unsectioned) fields
         // into the first section, creating one if the collection has none.
         if (sortedSections.length === 0 && unsectioned.length > 0) {
-          setSections([{ name: 'Section 1', fields: unsectioned }]);
+          setSections([{ name: 'section_1', fields: unsectioned }]);
         } else {
           setSections(sortedSections.map((s, idx) => ({
             name: s.name,
@@ -93,13 +94,14 @@ export function CollectionEditor() {
   // Section management
   const addSection = () => {
     setSections(produce((s) => s.push({
-      name: `Section ${s.length + 1}`,
+      name: `section_${s.length + 1}`,
       fields: [{ name: '', type: 'TEXT', required: false }]
     })));
   };
 
   const updateSectionName = (index: number, name: string) => {
-    setSections(index, 'name', name);
+    const newName = NameTransformer(name)
+    setSections(index, 'name', newName);
   };
 
   const removeSection = (index: number) => {
@@ -284,14 +286,10 @@ export function CollectionEditor() {
 
   return (
     <div class="schema-builder">
-      <header class="page-header">
-        <div class="header-left">
-          <button class="btn btn-text" onClick={handleCancel}>
-            &larr; Cancel
-          </button>
-          <h2>{isEditMode() ? `Edit Collection Schema: ${params.name}` : 'New Collection Schema'}</h2>
-        </div>
-      </header>
+      <Header
+        back={true}
+        title={isEditMode() ? `Edit Collection Schema: ${params.name}` : 'New Collection Schema'}
+      />
 
       <Show when={error()}>
         <div class="error-banner">{error()}</div>

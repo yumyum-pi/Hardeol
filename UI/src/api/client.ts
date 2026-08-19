@@ -1,4 +1,4 @@
-import { ApiResponse, Collection, CreateCollectionRequest, FormView, TableView, UpdateCollectionRequest, ValidationError, ValidationProfile } from "../types/collection";
+import { ApiResponse, Collection, CreateCollectionRequest, FilterRule, FormView, TableView, UpdateCollectionRequest, ValidationError, ValidationProfile } from "../types/collection";
 
 const API_BASE = '/api';
 
@@ -47,8 +47,15 @@ export const api = {
     }),
 
   // Records
-  listRecords: (collectionName: string) =>
-    request<Record<string, unknown>[]>(`/collection/${collectionName}`),
+  listRecords: (collectionName: string, filters?: FilterRule[]) => {
+    if (filters && filters.length > 0) {
+      return request<Record<string, unknown>[]>(`/collection/${collectionName}/query`, {
+        method: 'POST',
+        body: JSON.stringify({ filters }),
+      });
+    }
+    return request<Record<string, unknown>[]>(`/collection/${collectionName}`);
+  },
 
   createRecord: (collectionName: string, data: Record<string, unknown>) =>
     request<Record<string, unknown>>(`/collection/${collectionName}`, {
@@ -69,22 +76,22 @@ export const api = {
 
   // Table Views
   listViews: (collectionName: string) =>
-    request<TableView[]>(`/collection/${collectionName}/views`),
+    request<TableView[]>(`/collection/${collectionName}/table-views`),
 
   createView: (collectionName: string, data: Omit<TableView, 'id' | 'collection_id'>) =>
-    request<TableView>(`/collection/${collectionName}/views`, {
+    request<TableView>(`/collection/${collectionName}/table-views`, {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
   updateView: (collectionName: string, viewId: number, data: Omit<TableView, 'id' | 'collection_id'>) =>
-    request<TableView>(`/collection/${collectionName}/views/${viewId}`, {
+    request<TableView>(`/collection/${collectionName}/table-views/${viewId}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
 
   deleteView: (collectionName: string, viewId: number) =>
-    request<string>(`/collection/${collectionName}/views/${viewId}`, {
+    request<string>(`/collection/${collectionName}/table-views/${viewId}`, {
       method: 'DELETE',
     }),
 

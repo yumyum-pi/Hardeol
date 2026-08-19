@@ -69,12 +69,33 @@ export interface ViewField {
   css_class?: string;
 }
 
+export type FilterOperator =
+  | 'equals'
+  | 'not_equals'
+  | 'contains'
+  | 'not_contains'
+  | 'starts_with'
+  | 'gt'
+  | 'gte'
+  | 'lt'
+  | 'lte'
+  | 'is_empty'
+  | 'is_not_empty';
+
+export interface FilterRule {
+  field: string;
+  operator: FilterOperator;
+  value?: string;
+}
+
 export interface TableView {
   id?: number;
   name: string;
   collection_id?: number;
   fields: ViewField[];
   is_default: boolean;
+  filters?: FilterRule[];
+  visible_filters?: ViewField[];
 }
 
 export type ActionType = 'CREATE' | 'UPDATE' | 'ALL';

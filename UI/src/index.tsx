@@ -1,5 +1,6 @@
 import { render } from 'solid-js/web';
 import './styles/global.css';
+import './styles/reset.css';
 import AppRouter from './routes';
 
 
