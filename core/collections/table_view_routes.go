@@ -9,6 +9,8 @@ import (
 	"yumyum-pi/Hardeol/core/router"
 )
 
+const PARAM_ID = "table-view-id";
+
 // TableViewRouter returns routes for table views for a specific collection
 func TableViewRouter(c *Collection) []crudRouterReturnType {
 	collectionID := c.ID
@@ -45,7 +47,7 @@ func TableViewRouter(c *Collection) []crudRouterReturnType {
 	}
 
 	handleUpdate := func(ctx *router.Ctx) {
-		viewIdStr := ctx.GetParam("viewId")
+		viewIdStr := ctx.GetParam(PARAM_ID)
 		viewId, err := strconv.Atoi(viewIdStr)
 		if err != nil {
 			ctx.ResponseError(http.StatusBadRequest, "invalid view ID")
@@ -90,7 +92,7 @@ func TableViewRouter(c *Collection) []crudRouterReturnType {
 	}
 
 	handleDelete := func(ctx *router.Ctx) {
-		viewIdStr := ctx.GetParam("viewId")
+		viewIdStr := ctx.GetParam(PARAM_ID)
 		viewId, err := strconv.Atoi(viewIdStr)
 		if err != nil {
 			ctx.ResponseError(http.StatusBadRequest, "invalid view ID")
@@ -119,12 +121,12 @@ func TableViewRouter(c *Collection) []crudRouterReturnType {
 		ctx.ResponseOk(http.StatusOK, "deleted")
 	}
 
-	basePath := fmt.Sprintf("/%s/%s/views", CollectionString, c.Name)
+	basePath := fmt.Sprintf("/%s/%s/table-views", CollectionString, c.Name)
 
 	return []crudRouterReturnType{
 		{router.MethodGET, basePath, handleList},
 		{router.MethodPOST, basePath, handleCreate},
-		{router.MethodPUT, fmt.Sprintf("%s/:viewId", basePath), handleUpdate},
-		{router.MethodDELETE, fmt.Sprintf("%s/:viewId", basePath), handleDelete},
+		{router.MethodPUT, fmt.Sprintf("%s/:%s", basePath, PARAM_ID), handleUpdate},
+		{router.MethodDELETE, fmt.Sprintf("%s/:%s", basePath, PARAM_ID), handleDelete},
 	}
 }
