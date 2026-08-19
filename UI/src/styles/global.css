@@ -683,6 +683,57 @@ input:disabled {
   border-color: var(--color-primary);
 }
 
+/* Quick Filters */
+.quick-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  margin-bottom: 1rem;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.quick-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 140px;
+}
+
+.quick-filter-group label {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+}
+
+.quick-filter-group input,
+.quick-filter-group select {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+}
+
+.quick-filter-range {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+}
+
+.quick-filter-range input {
+  min-width: 0;
+}
+
+.quick-filter-clear {
+  align-self: flex-end;
+  margin-left: auto;
+}
+
 /* View Manager Modal */
 .view-manager-modal {
   /* max-width: 560px; */

@@ -1,7 +1,9 @@
 import { createSignal, For, Show } from 'solid-js';
 import { createStore } from 'solid-js/store';
 import { api } from '../../../api/client';
-import { SchemaField, TableView, ViewField } from '../../../types/collection';
+import { FilterOperator, FilterRule, SchemaField, TableView, ViewField } from '../../../types/collection';
+import { needsValue, OPERATOR_LABELS, OPERATORS_BY_TYPE } from '../../../utils/filters';
+import { isQuickFilterable } from '../../../utils/quickFilters';
 import "./table-view.css";
 
 interface ViewManagerProps {
@@ -18,10 +20,38 @@ export function TableViewManager(props: ViewManagerProps) {
   const [viewName, setViewName] = createSignal('');
   const [isDefault, setIsDefault] = createSignal(false);
   const [selectedFields, setSelectedFields] = createStore<Record<string, { selected: boolean; order: number; cssClass: string }>>({});
+  const [filterRules, setFilterRules] = createSignal<FilterRule[]>([]);
+  const [visibleFilterFields, setVisibleFilterFields] = createStore<Record<string, { selected: boolean; order: number; cssClass: string }>>({});
   const [error, setError] = createSignal<string | null>(null);
 
   // Available fields (excluding 'id' since it's always included)
   const availableFields = () => props.schemaFields.filter(f => f.type !== 'TABLE');
+
+  // Fields eligible to appear as a user-level quick-filter widget (same eligibility
+  // rule as the listing page's quick-filter bar).
+  const filterableFields = () => props.schemaFields.filter(f => isQuickFilterable(f.type));
+
+  const fieldByName = (name: string) => props.schemaFields.find(f => f.name === name);
+
+  const addFilterRule = () => {
+    const first = availableFields()[0];
+    if (!first) return;
+    setFilterRules([...filterRules(), { field: first.name, operator: OPERATORS_BY_TYPE[first.type][0], value: '' }]);
+  };
+
+  const updateFilterRule = (index: number, updates: Partial<FilterRule>) => {
+    setFilterRules(filterRules().map((rule, i) => (i === index ? { ...rule, ...updates } : rule)));
+  };
+
+  const handleFilterFieldChange = (index: number, fieldName: string) => {
+    const field = fieldByName(fieldName);
+    const operator = field ? OPERATORS_BY_TYPE[field.type][0] : 'equals';
+    updateFilterRule(index, { field: fieldName, operator: operator as FilterOperator, value: '' });
+  };
+
+  const removeFilterRule = (index: number) => {
+    setFilterRules(filterRules().filter((_, i) => i !== index));
+  };
 
   const initializeFieldsForEdit = (view: TableView) => {
     // Reset all fields
@@ -54,12 +84,44 @@ export function TableViewManager(props: ViewManagerProps) {
     }
   };
 
+  const initializeVisibleFiltersForEdit = (view: TableView) => {
+    const initial: Record<string, { selected: boolean; order: number; cssClass: string }> = {};
+    filterableFields().forEach((f, idx) => {
+      const vf = view.visible_filters?.find(x => x.name === f.name);
+      initial[f.name] = {
+        selected: !!vf,
+        order: vf?.order ?? idx,
+        cssClass: vf?.css_class ?? '',
+      };
+    });
+    for (const [key, value] of Object.entries(initial)) {
+      setVisibleFilterFields(key, value);
+    }
+  };
+
+  const initializeVisibleFiltersForCreate = () => {
+    const initial: Record<string, { selected: boolean; order: number; cssClass: string }> = {};
+    filterableFields().forEach((f, idx) => {
+      initial[f.name] = {
+        // Opt-in: unlike columns, quick filters default OFF until explicitly enabled.
+        selected: false,
+        order: idx,
+        cssClass: '',
+      };
+    });
+    for (const [key, value] of Object.entries(initial)) {
+      setVisibleFilterFields(key, value);
+    }
+  };
+
   const openCreate = () => {
     setEditingView(null);
     setIsCreating(true);
     setViewName('');
     setIsDefault(false);
+    setFilterRules([]);
     initializeFieldsForCreate();
+    initializeVisibleFiltersForCreate();
   };
 
   const openEdit = (view: TableView) => {
@@ -67,7 +129,9 @@ export function TableViewManager(props: ViewManagerProps) {
     setEditingView(view);
     setViewName(view.name);
     setIsDefault(view.is_default);
+    setFilterRules(view.filters ? [...view.filters] : []);
     initializeFieldsForEdit(view);
+    initializeVisibleFiltersForEdit(view);
   };
 
   const closeForm = () => {
@@ -104,10 +168,25 @@ export function TableViewManager(props: ViewManagerProps) {
     // Sort by order
     fields.sort((a, b) => a.order - b.order);
 
+    // Build visible_filters array from selected quick-filter fields (zero is valid, unlike columns)
+    const visibleFilters: ViewField[] = [];
+    for (const [fieldName, config] of Object.entries(visibleFilterFields)) {
+      if (config.selected) {
+        visibleFilters.push({
+          name: fieldName,
+          order: config.order,
+          css_class: config.cssClass || undefined,
+        });
+      }
+    }
+    visibleFilters.sort((a, b) => a.order - b.order);
+
     const viewData = {
       name,
       fields,
       is_default: isDefault(),
+      filters: filterRules(),
+      visible_filters: visibleFilters,
     };
 
     let response;
@@ -157,6 +236,27 @@ export function TableViewManager(props: ViewManagerProps) {
     return [...availableFields()].sort((a, b) => {
       const orderA = selectedFields[a.name]?.order ?? 0;
       const orderB = selectedFields[b.name]?.order ?? 0;
+      return orderA - orderB;
+    });
+  };
+
+  const moveVisibleFilterField = (fieldName: string, direction: 'up' | 'down') => {
+    const fields = filterableFields();
+    const currentOrder = visibleFilterFields[fieldName]?.order ?? 0;
+    const newOrder = direction === 'up' ? currentOrder - 1 : currentOrder + 1;
+
+    const swapField = fields.find(f => (visibleFilterFields[f.name]?.order ?? 0) === newOrder);
+
+    if (swapField) {
+      setVisibleFilterFields(swapField.name, 'order', currentOrder);
+    }
+    setVisibleFilterFields(fieldName, 'order', newOrder);
+  };
+
+  const sortedFilterableFields = () => {
+    return [...filterableFields()].sort((a, b) => {
+      const orderA = visibleFilterFields[a.name]?.order ?? 0;
+      const orderB = visibleFilterFields[b.name]?.order ?? 0;
       return orderA - orderB;
     });
   };
@@ -281,6 +381,155 @@ export function TableViewManager(props: ViewManagerProps) {
                   </For></tbody>
               </table>
             </div>
+          </div>
+
+          <div class="form-group">
+            <label>Visible Filters</label>
+            <div class="field-selector table-container collection">
+              <table class='data-table'>
+                <thead>
+                  <tr>
+                    <th>Show</th>
+                    <th>Field</th>
+                    <th>Class</th>
+                    <th>Arrange</th>
+                  </tr></thead>
+                <tbody>
+                  <For each={sortedFilterableFields()}>
+                    {(field, index) => (
+                      <tr>
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={visibleFilterFields[field.name]?.selected ?? false}
+                            onChange={(e) => setVisibleFilterFields(field.name, 'selected', e.currentTarget.checked)}
+                          />
+                        </td>
+                        <td>{field.name}</td>
+                        <td>
+                          <input
+                            type="text"
+                            class="css-class-input"
+                            placeholder="CSS class"
+                            value={visibleFilterFields[field.name]?.cssClass ?? ''}
+                            onInput={(e) => setVisibleFilterFields(field.name, 'cssClass', e.currentTarget.value)}
+                          />
+                        </td>
+                        <td class="order-buttons">
+                          <button
+                            type="button"
+                            class="btn btn-xs"
+                            disabled={index() === 0}
+                            onClick={() => moveVisibleFilterField(field.name, 'up')}
+                          >
+                            ↑
+                          </button>
+                          <button
+                            type="button"
+                            class="btn btn-xs"
+                            disabled={index() === sortedFilterableFields().length - 1}
+                            onClick={() => moveVisibleFilterField(field.name, 'down')}
+                          >
+                            ↓
+                          </button>
+                        </td>
+                      </tr>
+                    )}
+                  </For></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Filters</label>
+            <div class="field-selector table-container collection">
+              <table class='data-table'>
+                <thead>
+                  <tr>
+                    <th>Field</th>
+                    <th>Operator</th>
+                    <th>Value</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <For each={filterRules()}>
+                    {(rule, index) => {
+                      const field = () => fieldByName(rule.field);
+                      return (
+                        <tr>
+                          <td>
+                            <select
+                              value={rule.field}
+                              onChange={(e) => handleFilterFieldChange(index(), e.currentTarget.value)}
+                            >
+                              <For each={availableFields()}>
+                                {(f) => <option value={f.name}>{f.name}</option>}
+                              </For>
+                            </select>
+                          </td>
+                          <td>
+                            <select
+                              value={rule.operator}
+                              onChange={(e) => updateFilterRule(index(), { operator: e.currentTarget.value as FilterOperator })}
+                            >
+                              <For each={field() ? OPERATORS_BY_TYPE[field()!.type] : []}>
+                                {(op) => <option value={op}>{OPERATOR_LABELS[op]}</option>}
+                              </For>
+                            </select>
+                          </td>
+                          <td>
+                            <Show when={needsValue(rule.operator)}>
+                              <Show
+                                when={field()?.type === 'BOOL'}
+                                fallback={
+                                  <Show
+                                    when={field()?.type === 'SELECT'}
+                                    fallback={
+                                      <input
+                                        type={field()?.type === 'NUMBER' ? 'number' : field()?.type === 'DATE' ? 'date' : 'text'}
+                                        value={rule.value ?? ''}
+                                        onInput={(e) => updateFilterRule(index(), { value: e.currentTarget.value })}
+                                      />
+                                    }
+                                  >
+                                    <select
+                                      value={rule.value ?? ''}
+                                      onChange={(e) => updateFilterRule(index(), { value: e.currentTarget.value })}
+                                    >
+                                      <option value="">Select...</option>
+                                      <For each={field()?.select_options ?? []}>
+                                        {(opt) => <option value={opt}>{opt}</option>}
+                                      </For>
+                                    </select>
+                                  </Show>
+                                }
+                              >
+                                <select
+                                  value={rule.value ?? ''}
+                                  onChange={(e) => updateFilterRule(index(), { value: e.currentTarget.value })}
+                                >
+                                  <option value="true">true</option>
+                                  <option value="false">false</option>
+                                </select>
+                              </Show>
+                            </Show>
+                          </td>
+                          <td>
+                            <button type="button" class="btn btn-xs btn-danger" onClick={() => removeFilterRule(index())}>
+                              Remove
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    }}
+                  </For>
+                </tbody>
+              </table>
+            </div>
+            <button type="button" class="btn btn-sm" onClick={addFilterRule}>
+              + Add Filter
+            </button>
           </div>
 
           <div class="form-actions">

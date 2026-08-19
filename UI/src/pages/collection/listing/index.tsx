@@ -1,10 +1,12 @@
-import { createSignal, createEffect, Show, onMount } from 'solid-js';
+import { createSignal, createEffect, createMemo, on, Show, onMount, untrack } from 'solid-js';
 import { useParams, A } from '@solidjs/router';
 import { api } from '../../../api/client';
 import { TableView } from '../../../types/collection';
 import { useCollectionData } from '../../../hooks/useCollectionData';
 import Header from '../../../components/header';
 import CollectionTableView from '../../../components/table-view';
+import { QuickFilterFieldConfig, QuickFilters } from '../../../components/quick-filters';
+import { buildQuickFilterRules, isQuickFilterable, QuickFilterState, QuickFilterValue } from '../../../utils/quickFilters';
 
 export function CollectionView() {
   const params = useParams();
@@ -19,10 +21,71 @@ export function CollectionView() {
   const [views, setViews] = createSignal<TableView[]>([]);
   const [showOptionsMenu, setShowOptionsMenu] = createSignal(false);
 
+  const [selectedViewId, setSelectedViewId] = createSignal<number | null>(null);
+  const [userSelectedView, setUserSelectedView] = createSignal(false);
+  const [quickFilterValues, setQuickFilterValues] = createSignal<QuickFilterState>({});
+
+  // Default to the collection's default view until the user picks one explicitly.
+  createEffect(() => {
+    if (!userSelectedView()) {
+      const defaultView = views().find(v => v.is_default);
+      setSelectedViewId(defaultView?.id ?? null);
+    }
+  });
+
+  const handleSelectView = (viewId: number | null) => {
+    setUserSelectedView(true);
+    setSelectedViewId(viewId);
+  };
+
+  // Table-level filter: hidden, non-editable, baked into the selected view.
+  const activeFilters = createMemo(() => views().find(v => v.id === selectedViewId())?.filters ?? []);
+
+  // Fields eligible for a user-level quick-filter widget: explicitly enabled via the
+  // selected view's `visible_filters` list (opt-in, admin-controlled — "All Fields"
+  // mode has no view to hold this list, so it shows none, same as it has no "Show"
+  // list for columns either).
+  const quickFilterFieldConfigs = createMemo(() => {
+    const view = views().find(v => v.id === selectedViewId());
+    if (!view || !view.visible_filters || view.visible_filters.length === 0) return [];
+    const schemaByName = new Map(collection()?.fields.map(f => [f.name, f]) ?? []);
+    return [...view.visible_filters]
+      .sort((a, b) => a.order - b.order)
+      .map((vf): QuickFilterFieldConfig | null => {
+        const field = schemaByName.get(vf.name);
+        return field && isQuickFilterable(field.type) ? { field, cssClass: vf.css_class } : null;
+      })
+      .filter((c): c is QuickFilterFieldConfig => c !== null);
+  });
+
+  const quickFilterSchemaFields = createMemo(() => quickFilterFieldConfigs().map(c => c.field));
+
+  const quickFilterRules = createMemo(() => buildQuickFilterRules(quickFilterSchemaFields(), quickFilterValues()));
+
+  // AND-only merge: table-level filter first, user quick filters appended.
+  const combinedFilters = createMemo(() => [...activeFilters(), ...quickFilterRules()]);
+
+  const handleQuickFilterChange = (fieldName: string, value: QuickFilterValue | undefined) => {
+    setQuickFilterValues(prev => {
+      const next = { ...prev };
+      if (value === undefined) {
+        delete next[fieldName];
+      } else {
+        next[fieldName] = value;
+      }
+      return next;
+    });
+  };
+
   const fetchRecords = async () => {
     setLoading(true);
     setError(null);
-    const [recordsResponse] = await Promise.all([api.listRecords(name()), fetchCollection()]);
+    // untrack: combinedFilters is a derived memo (ultimately reads collection(), which
+    // gets a fresh reference from every fetchCollection() call below); reading it
+    // reactively here would make whichever effect calls fetchRecords() re-fire on
+    // every fetch, causing an infinite refetch loop. Refetch timing is driven
+    // explicitly by the effects below instead.
+    const [recordsResponse] = await Promise.all([api.listRecords(name(), untrack(combinedFilters)), fetchCollection()]);
     if (recordsResponse.error) {
       setError(recordsResponse.error);
       setIsCollection(false);
@@ -63,6 +126,20 @@ export function CollectionView() {
       fetchViews();
     }
   });
+
+  // Switching views changes which fields are even visible, so a quick filter left
+  // over from the previous view could silently reapply later (e.g. on "All Fields").
+  createEffect(on(selectedViewId, () => {
+    setQuickFilterValues({});
+  }, { defer: true }));
+
+  // Refetch whenever the user-controlled filter inputs change. Deliberately tracks
+  // selectedViewId/quickFilterValues (stable signals) rather than the combinedFilters
+  // memo itself — that memo transitively reads collection(), which gets a new object
+  // reference on every fetch, so tracking it directly would refetch forever.
+  createEffect(on([selectedViewId, quickFilterValues], () => {
+    if (isCollection()) fetchRecords();
+  }, { defer: true }));
 
   const NoCollectionView = () => {
     return (
@@ -108,6 +185,15 @@ export function CollectionView() {
           <div class="error-banner">{error()}</div>
         </Show>
 
+        <Show when={isCollection()}>
+          <QuickFilters
+            fields={quickFilterFieldConfigs()}
+            values={quickFilterValues()}
+            onChange={handleQuickFilterChange}
+            onClear={() => setQuickFilterValues({})}
+          />
+        </Show>
+
         <Show when={loading()}>
           <div class="loading">Loading...</div>
         </Show>
@@ -127,6 +213,8 @@ export function CollectionView() {
             getTableFields={getTableFields()}
             collection={collection()}
             records={records()}
+            selectedViewId={selectedViewId()}
+            onSelectView={handleSelectView}
             actionFn={(index) => {
               const record = records()[index];
               return (

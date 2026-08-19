@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, For, JSXElement, Show } from "solid-js";
+import { createMemo, For, JSXElement, Show } from "solid-js";
 import { Collection, SchemaField, TableView } from "../types/collection";
 
 interface TableViewSelectorProps {
@@ -44,26 +44,12 @@ type CollectionTableViewProps = {
   collection: Collection | null;
   records: Record<string, unknown>[];
   actionFn: (index: number) => JSXElement;
+  selectedViewId: number | null;
+  onSelectView: (viewId: number | null) => void;
 }
 
 const CollectionTableView = (props: CollectionTableViewProps) => {
-  const [selectedViewId, setSelectedViewId] = createSignal<number | null>(null);
-  const [userSelected, setUserSelected] = createSignal(false);
-
-  // Default to the collection's default view until the user picks one explicitly.
-  createEffect(() => {
-    if (!userSelected()) {
-      const defaultView = props.views.find(v => v.is_default);
-      setSelectedViewId(defaultView?.id ?? null);
-    }
-  });
-
-  const handleSelectView = (viewId: number | null) => {
-    setUserSelected(true);
-    setSelectedViewId(viewId);
-  };
-
-  const selectedView = () => props.views.find(v => v.id === selectedViewId());
+  const selectedView = () => props.views.find(v => v.id === props.selectedViewId);
 
   const displayColumns = createMemo(() => {
     const view = selectedView();
@@ -92,8 +78,8 @@ const CollectionTableView = (props: CollectionTableViewProps) => {
       <div class="table-view-toolbar">
         <TableViewSelector
           views={props.views}
-          selectedViewId={selectedViewId()}
-          onSelect={handleSelectView}
+          selectedViewId={props.selectedViewId}
+          onSelect={props.onSelectView}
         />
       </div>
       <div class="table-container collection">

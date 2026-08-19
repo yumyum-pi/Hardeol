@@ -9,7 +9,7 @@ import (
 	"yumyum-pi/Hardeol/core/router"
 )
 
-const PARAM_ID = "table-view-id";
+const PARAM_ID = "table-view-id"
 
 // TableViewRouter returns routes for table views for a specific collection
 func TableViewRouter(c *Collection) []crudRouterReturnType {
@@ -82,6 +82,8 @@ func TableViewRouter(c *Collection) []crudRouterReturnType {
 		existingView.Name = view.Name
 		existingView.Fields = view.Fields
 		existingView.IsDefault = view.IsDefault
+		existingView.Filters = view.Filters
+		existingView.VisibleFilters = view.VisibleFilters
 
 		if err := db.Save(&existingView).Error; err != nil {
 			ctx.ResponseError(http.StatusInternalServerError, err.Error())

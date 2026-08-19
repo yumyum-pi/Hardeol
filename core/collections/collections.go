@@ -199,6 +199,7 @@ func UpdateCollectionRoutes(cc Collection, db *gorm.DB, r *router.DynamicRouter)
 	// Remove old routes
 	r.Remove(router.MethodGET, basePath)
 	r.Remove(router.MethodPOST, basePath)
+	r.Remove(router.MethodPOST, basePath+"/query")
 	r.Remove(router.MethodPUT, basePath+"/:id")
 	r.Remove(router.MethodDELETE, basePath+"/:id")
 
@@ -241,7 +242,6 @@ func CRUDRouter(c *Collection) []crudRouterReturnType {
 
 	// handle list to collection
 	// TODO: add the following
-	// - Add filter
 	// - Add pagenation
 	handleList := func(ctx *router.Ctx) {
 		// create slice at runtime
@@ -251,6 +251,42 @@ func CRUDRouter(c *Collection) []crudRouterReturnType {
 
 		db := database.Get()
 		res := db.Table(c.Name).Find(&valSlice)
+		if res.Error != nil {
+			// TODO: proper error check
+			ctx.ResponseError(http.StatusInternalServerError, res.Error.Error())
+			return
+		}
+		ctx.ResponseOk(http.StatusOK, valSlice)
+	}
+
+	// handle filtered list to collection (POST, filters carried in the JSON body
+	// rather than a query param — the frontend uses fetch(), which forbids a body
+	// on GET requests, so filtered listing lives on its own POST route instead of
+	// overloading the query-string-only GET above).
+	handleQuery := func(ctx *router.Ctx) {
+		sliceType := reflect.SliceOf(t)
+		sliceValue := reflect.MakeSlice(sliceType, 0, 0)
+		valSlice := sliceValue.Interface()
+
+		var body struct {
+			Filters []FilterRule `json:"filters"`
+		}
+		if err := json.NewDecoder(ctx.Request.Body).Decode(&body); err != nil {
+			ctx.ResponseError(http.StatusBadRequest, "Invalid JSON: "+err.Error())
+			return
+		}
+
+		db := database.Get().Table(c.Name)
+		if len(body.Filters) > 0 {
+			var err error
+			db, err = ApplyFilters(db, c.Fields, body.Filters)
+			if err != nil {
+				ctx.ResponseError(http.StatusBadRequest, err.Error())
+				return
+			}
+		}
+
+		res := db.Find(&valSlice)
 		if res.Error != nil {
 			// TODO: proper error check
 			ctx.ResponseError(http.StatusInternalServerError, res.Error.Error())
@@ -367,6 +403,11 @@ func CRUDRouter(c *Collection) []crudRouterReturnType {
 		router.MethodPOST,
 		fmt.Sprintf("/%s/%s", CollectionString, c.Name),
 		handleCreate,
+	})
+	asdf = append(asdf, crudRouterReturnType{
+		router.MethodPOST,
+		fmt.Sprintf("/%s/%s/query", CollectionString, c.Name),
+		handleQuery,
 	})
 	asdf = append(asdf, crudRouterReturnType{
 		router.MethodPUT,
