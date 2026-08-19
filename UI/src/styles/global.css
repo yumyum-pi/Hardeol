@@ -27,7 +27,8 @@
   --main-content-padding: 2rem;
   --sidebar-width: 260px;
   --main-content-width: calc(100% - var(--sidebar-width));
---row-height: 36px;
+  --main-content-height: calc(100vh - var(--nav-height) - 2.5rem);
+  --row-height: 36px;
 }
 
 body {
