@@ -226,12 +226,13 @@ export function TableViewManager(props: ViewManagerProps) {
 
           <div class="form-group">
             <label>Fields</label>
-            <div class="field-selector">
-              <table>
+            <div class="field-selector table-container collection">
+              <table class='data-table'>
                 <thead>
                   <tr>
                     <th>Show</th>
                     <th>Field</th>
+                    <th>Type</th>
                     <th>Class</th>
                     <th>Arrange</th>
                   </tr></thead>
@@ -247,6 +248,7 @@ export function TableViewManager(props: ViewManagerProps) {
                           />
                         </td>
                         <td>{field.name}</td>
+                        <td>{field.type}</td>
                         <td>
                           <input
                             type="text"

@@ -8,7 +8,7 @@ interface TableViewSelectorProps {
   onManage?: () => void;
 }
 
-export function TableViewSelector(props: TableViewSelectorProps) {
+const TableViewSelector = (props: TableViewSelectorProps) => {
   return (
     <div class="view-selector">
       <select
