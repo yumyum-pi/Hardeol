@@ -118,8 +118,21 @@ export function CollectionView() {
     fetchRecords();
   });
 
+  let previousName: string | undefined;
   createEffect(() => {
     const currentName = name();
+    // Switching collections: the previous collection's view/filters no longer apply
+    // (fields differ), so clear them before fetching or the next fetchRecords() call
+    // below would build combinedFilters from the old collection's view and send a
+    // stale, likely-invalid filter payload.
+    if (previousName !== undefined && currentName !== previousName) {
+      setViews([]);
+      setSelectedViewId(null);
+      setUserSelectedView(false);
+      setQuickFilterValues({});
+    }
+    previousName = currentName;
+
     const collectionLoaded = isCollection();
     if (currentName && collectionLoaded) {
       fetchRecords();
