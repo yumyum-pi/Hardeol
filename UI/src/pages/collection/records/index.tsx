@@ -72,31 +72,29 @@ export function RecordFormPage() {
   };
 
   const validateFormData = (data: Record<string, string>): ValidationError[] => {
-    const profiles = validationProfiles().filter(p =>
-      p.is_active && (p.action_type === actionType() || p.action_type === 'ALL')
-    );
-    if (profiles.length === 0) return [];
+    const view = getActiveFormView(actionType());
+    const profileId = view?.validation_profile_id;
+    const profile = profileId
+      ? validationProfiles().find(p => p.id === profileId && p.is_active)
+      : undefined;
+    if (!profile) return [];
 
     const coerced: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(data)) {
       coerced[key] = coerceFieldValue(fieldsMap().get(key), value);
     }
 
-    let allErrors: ValidationError[] = [];
-    for (const profile of profiles) {
-      const result = validateRecord(
-        {
-          field_rules: profile.field_rules,
-          section_rules: profile.section_rules,
-          collection_rules: profile.collection_rules,
-        },
-        fieldsMap(),
-        coerced,
-        actionType()
-      );
-      allErrors = [...allErrors, ...result.errors];
-    }
-    return allErrors;
+    const result = validateRecord(
+      {
+        field_rules: profile.field_rules,
+        section_rules: profile.section_rules,
+        collection_rules: profile.collection_rules,
+      },
+      fieldsMap(),
+      coerced,
+      actionType()
+    );
+    return result.errors;
   };
 
   const loadLineItems = async (id: number) => {

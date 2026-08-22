@@ -60,10 +60,11 @@ func (f *FormFieldList) Scan(value interface{}) error {
 
 // FormView represents a saved form view configuration for a collection
 type FormView struct {
-	ID           int           `json:"id" gorm:"primaryKey;autoIncrement"`
-	Name         string        `json:"name"`
-	CollectionID int           `json:"collection_id"`
-	ActionType   ActionType    `json:"action_type"`
-	Fields       FormFieldList `json:"fields" gorm:"type:TEXT"`
-	IsDefault    bool          `json:"is_default"`
+	ID                  int           `json:"id" gorm:"primaryKey;autoIncrement"`
+	Name                string        `json:"name"`
+	CollectionID        int           `json:"collection_id"`
+	ActionType          ActionType    `json:"action_type"`
+	Fields              FormFieldList `json:"fields" gorm:"type:TEXT"`
+	IsDefault           bool          `json:"is_default"`
+	ValidationProfileID *int          `json:"validation_profile_id,omitempty"`
 }

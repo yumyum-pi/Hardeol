@@ -2,7 +2,7 @@ import { createSignal, onMount, Show } from 'solid-js';
 import { useParams, useNavigate } from '@solidjs/router';
 import { api } from '../../../api/client';
 import { useCollectionData } from '../../../hooks/useCollectionData';
-import { FormView } from '../../../types/collection';
+import { FormView, ValidationProfile } from '../../../types/collection';
 import { FormViewManager } from './FormViewManager';
 import Header from '../../../components/header';
 
@@ -13,6 +13,7 @@ export function FormViewsPage() {
 
   const { collection, fetchCollection } = useCollectionData(name);
   const [views, setViews] = createSignal<FormView[]>([]);
+  const [validationProfiles, setValidationProfiles] = createSignal<ValidationProfile[]>([]);
   const [loading, setLoading] = createSignal(true);
 
   const fetchFormViews = async () => {
@@ -20,9 +21,14 @@ export function FormViewsPage() {
     if (response.data) setViews(response.data);
   };
 
+  const fetchValidationProfiles = async () => {
+    const response = await api.listValidationProfiles(name());
+    if (response.data) setValidationProfiles(response.data);
+  };
+
   onMount(async () => {
     setLoading(true);
-    await Promise.all([fetchCollection(), fetchFormViews()]);
+    await Promise.all([fetchCollection(), fetchFormViews(), fetchValidationProfiles()]);
     setLoading(false);
   });
 
@@ -40,6 +46,7 @@ export function FormViewsPage() {
           collectionName={name()}
           schemaFields={collection()!.fields}
           views={views()}
+          validationProfiles={validationProfiles()}
           onClose={handleBack}
           onViewsChanged={fetchFormViews}
         />

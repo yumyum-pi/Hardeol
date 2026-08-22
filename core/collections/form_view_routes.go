@@ -56,6 +56,14 @@ func FormViewRouter(c *Collection) []crudRouterReturnType {
 			return
 		}
 
+		if view.ValidationProfileID != nil {
+			var profile ValidationProfile
+			if err := db.First(&profile, *view.ValidationProfileID).Error; err != nil || profile.CollectionID != collectionID {
+				ctx.ResponseError(http.StatusBadRequest, "invalid validation_profile_id")
+				return
+			}
+		}
+
 		view.CollectionID = collectionID
 
 		// If this is set as default, unset other defaults for the same action type
@@ -128,6 +136,14 @@ func FormViewRouter(c *Collection) []crudRouterReturnType {
 			return
 		}
 
+		if view.ValidationProfileID != nil {
+			var profile ValidationProfile
+			if err := db.First(&profile, *view.ValidationProfileID).Error; err != nil || profile.CollectionID != collectionID {
+				ctx.ResponseError(http.StatusBadRequest, "invalid validation_profile_id")
+				return
+			}
+		}
+
 		// If setting as default, unset others for the same action type first
 		if view.IsDefault && !existingView.IsDefault {
 			db.Model(&FormView{}).
@@ -139,6 +155,7 @@ func FormViewRouter(c *Collection) []crudRouterReturnType {
 		existingView.ActionType = view.ActionType
 		existingView.Fields = view.Fields
 		existingView.IsDefault = view.IsDefault
+		existingView.ValidationProfileID = view.ValidationProfileID
 
 		if err := db.Save(&existingView).Error; err != nil {
 			ctx.ResponseError(http.StatusInternalServerError, err.Error())

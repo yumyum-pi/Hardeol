@@ -120,6 +120,7 @@ export interface FormView {
   action_type: ActionType;
   fields: FormFieldConfig[];
   is_default: boolean;
+  validation_profile_id?: number | null;
 }
 
 // Validation Types

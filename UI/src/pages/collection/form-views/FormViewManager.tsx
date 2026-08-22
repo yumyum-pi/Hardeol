@@ -1,12 +1,13 @@
 import { createSignal, For, Show } from 'solid-js';
 import { createStore } from 'solid-js/store';
 import { api } from '../../../api/client';
-import { SchemaField, FormView, FieldWidth, ActionType, FormFieldConfig } from '../../../types/collection';
+import { SchemaField, FormView, FieldWidth, ActionType, FormFieldConfig, ValidationProfile } from '../../../types/collection';
 
 interface FormViewManagerProps {
   collectionName: string;
   schemaFields: SchemaField[];
   views: FormView[];
+  validationProfiles: ValidationProfile[];
   onClose: () => void;
   onViewsChanged: () => void;
 }
@@ -28,6 +29,7 @@ export function FormViewManager(props: FormViewManagerProps) {
   const [viewName, setViewName] = createSignal('');
   const [actionType, setActionType] = createSignal<ActionType>('ALL');
   const [isDefault, setIsDefault] = createSignal(false);
+  const [validationProfileId, setValidationProfileId] = createSignal<number | null>(null);
   const [fieldConfigs, setFieldConfigs] = createStore<Record<string, FieldState>>({});
   const [error, setError] = createSignal<string | null>(null);
 
@@ -79,6 +81,7 @@ export function FormViewManager(props: FormViewManagerProps) {
     setViewName('');
     setActionType('ALL');
     setIsDefault(false);
+    setValidationProfileId(null);
     initializeFieldsForCreate();
   };
 
@@ -88,6 +91,7 @@ export function FormViewManager(props: FormViewManagerProps) {
     setViewName(view.name);
     setActionType(view.action_type);
     setIsDefault(view.is_default);
+    setValidationProfileId(view.validation_profile_id ?? null);
     initializeFieldsForEdit(view);
   };
 
@@ -135,6 +139,7 @@ export function FormViewManager(props: FormViewManagerProps) {
       action_type: actionType(),
       fields,
       is_default: isDefault(),
+      validation_profile_id: validationProfileId(),
     };
 
     let response;
@@ -263,6 +268,19 @@ export function FormViewManager(props: FormViewManagerProps) {
                 <option value="ALL">Both Create & Update</option>
                 <option value="CREATE">Create Only</option>
                 <option value="UPDATE">Update Only</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>Validation Profile</label>
+              <select
+                value={validationProfileId() ?? ''}
+                onChange={(e) => setValidationProfileId(e.currentTarget.value ? Number(e.currentTarget.value) : null)}
+              >
+                <option value="">None</option>
+                <For each={props.validationProfiles}>
+                  {(p) => <option value={p.id}>{p.name}</option>}
+                </For>
               </select>
             </div>
           </div>
