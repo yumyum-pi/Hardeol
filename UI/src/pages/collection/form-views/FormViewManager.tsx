@@ -207,45 +207,6 @@ export function FormViewManager(props: FormViewManagerProps) {
         <div class="error-banner">{error()}</div>
       </Show>
 
-      <Show when={!isCreating() && !editingView()}>
-        <div class="view-list">
-          <Show when={props.views.length === 0}>
-            <p class="empty-text">No saved form views yet</p>
-          </Show>
-          <For each={props.views}>
-            {(view) => (
-              <div class="view-item">
-                <span class="view-name">
-                  {view.name}
-                  <Show when={view.is_default}>
-                    <span class="default-badge">Default</span>
-                  </Show>
-                </span>
-                <span class="view-action-type">{getActionTypeLabel(view.action_type)}</span>
-                <span class="view-field-count">{view.fields.filter(f => f.visible).length} fields</span>
-                <div class="view-actions">
-                  <button class="btn btn-sm" onClick={() => openEdit(view)}>
-                    Edit
-                  </button>
-                  <button class="btn btn-danger btn-sm" onClick={() => handleDelete(view)}>
-                    Delete
-                  </button>
-                </div>
-              </div>
-            )}
-          </For>
-        </div>
-
-        <div class="form-actions">
-          <button class="btn" onClick={props.onClose}>
-            Close
-          </button>
-          <button class="btn btn-primary" onClick={openCreate}>
-            + New Form View
-          </button>
-        </div>
-      </Show>
-
       <Show when={isCreating() || editingView()}>
         <form onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
           <div class="form-row">
