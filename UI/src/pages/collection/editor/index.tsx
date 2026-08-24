@@ -48,14 +48,12 @@ export function CollectionEditor() {
             const field: Field = {
               name: f.name,
               type: f.type,
-              required: f.required,
               select_options: f.select_options,
               select_options_text: (f.select_options || []).join(', '),
               order: f.order ?? 0,
               table_fields: f.table_fields?.map(tf => ({
                 name: tf.name,
                 type: tf.type,
-                required: tf.required,
                 select_options: tf.select_options,
                 select_options_text: (tf.select_options || []).join(', '),
               })) || [],
@@ -95,7 +93,7 @@ export function CollectionEditor() {
   const addSection = () => {
     setSections(produce((s) => s.push({
       name: `section_${s.length + 1}`,
-      fields: [{ name: '', type: 'TEXT', required: false }]
+      fields: [{ name: '', type: 'TEXT' }]
     })));
   };
 
@@ -134,7 +132,7 @@ export function CollectionEditor() {
 
   // Field management for section fields
   const addSectionField = (sectionIndex: number) => {
-    setSections(sectionIndex, 'fields', produce((f) => f.push({ name: '', type: 'TEXT', required: false })));
+    setSections(sectionIndex, 'fields', produce((f) => f.push({ name: '', type: 'TEXT' })));
   };
 
   const removeSectionField = (sectionIndex: number, fieldIndex: number) => {
@@ -158,7 +156,7 @@ export function CollectionEditor() {
       if (!f[fieldIndex].table_fields) {
         f[fieldIndex].table_fields = [];
       }
-      f[fieldIndex].table_fields!.push({ name: '', type: 'TEXT', required: false });
+      f[fieldIndex].table_fields!.push({ name: '', type: 'TEXT' });
     }));
   };
 
@@ -222,7 +220,6 @@ export function CollectionEditor() {
       const fieldObj: Omit<SchemaField, 'id' | 'collection_id'> = {
         name: field.name.trim(),
         type: field.type,
-        required: field.required,
         section_index: sectionIndex,
         order: idx,
       };
@@ -242,7 +239,6 @@ export function CollectionEditor() {
             return {
               name: tf.name.trim(),
               type: tf.type,
-              required: tf.required,
               ...(tf.type === 'SELECT' && tfSelectOptions && tfSelectOptions.length > 0 ? { select_options: tfSelectOptions } : {}),
             };
           });

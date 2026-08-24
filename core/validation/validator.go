@@ -53,7 +53,6 @@ type Profile struct {
 type Field struct {
 	Name          string
 	Type          string
-	Required      bool
 	SelectOptions []string
 	SectionID     *int
 }
@@ -61,6 +60,7 @@ type Field struct {
 // FieldRule represents validation rules for a field
 type FieldRule struct {
 	FieldName    string
+	Required     bool
 	MinLength    *int
 	MaxLength    *int
 	Regex        *string
@@ -166,8 +166,21 @@ func validateFieldRules(rules []FieldRule, fields map[string]Field, data map[str
 func validateField(rule FieldRule, field Field, value interface{}, data map[string]interface{}) []ValidationError {
 	var errors []ValidationError
 
-	// Skip validation if value is empty and field is not required
-	if isEmpty(value) && !field.Required {
+	// If the value is empty, either flag it as missing (if required) or skip
+	// the rest of the checks (nothing meaningful to validate on an empty value).
+	if isEmpty(value) {
+		if rule.Required {
+			msg := "This field is required"
+			if rule.ErrorMessage != nil {
+				msg = *rule.ErrorMessage
+			}
+			errors = append(errors, ValidationError{
+				Field:    rule.FieldName,
+				RuleType: "field",
+				Message:  msg,
+				Code:     "REQUIRED",
+			})
+		}
 		return errors
 	}
 

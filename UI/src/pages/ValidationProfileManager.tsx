@@ -22,6 +22,7 @@ interface ValidationProfileManagerProps {
 
 interface FieldRuleState {
   enabled: boolean;
+  required: boolean;
   min_length?: number;
   max_length?: number;
   regex?: string;
@@ -61,6 +62,7 @@ export function ValidationProfileManager(props: ValidationProfileManagerProps) {
       const rule = profile.field_rules.find(r => r.field_name === f.name);
       initial[f.name] = {
         enabled: !!rule,
+        required: rule?.required || false,
         min_length: rule?.min_length,
         max_length: rule?.max_length,
         regex: rule?.regex,
@@ -86,6 +88,7 @@ export function ValidationProfileManager(props: ValidationProfileManagerProps) {
     availableFields().forEach(f => {
       initial[f.name] = {
         enabled: false,
+        required: false,
         integer_only: false,
       };
     });
@@ -136,6 +139,7 @@ export function ValidationProfileManager(props: ValidationProfileManagerProps) {
         const rule: FieldRule = {
           field_name: fieldName,
         };
+        if (config.required) rule.required = config.required;
         if (config.min_length !== undefined) rule.min_length = config.min_length;
         if (config.max_length !== undefined) rule.max_length = config.max_length;
         if (config.regex) rule.regex = config.regex;
@@ -255,6 +259,17 @@ export function ValidationProfileManager(props: ValidationProfileManagerProps) {
 
         <Show when={config.enabled}>
           <div class="field-rule-options">
+            <div class="rule-option">
+              <label class="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={config.required}
+                  onChange={(e) => setFieldRules(field.name, 'required', e.currentTarget.checked)}
+                />
+                Required
+              </label>
+            </div>
+
             {/* TEXT/EMAIL/URL rules */}
             <Show when={['TEXT', 'EMAIL', 'URL'].includes(fieldType)}>
               <div class="rule-option">

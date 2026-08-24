@@ -71,12 +71,20 @@ export function RecordFormPage() {
     return formViews().filter(v => v.action_type === at || v.action_type === 'ALL');
   };
 
-  const validateFormData = (data: Record<string, string>): ValidationError[] => {
+  const getActiveProfile = (): ValidationProfile | undefined => {
     const view = getActiveFormView(actionType());
     const profileId = view?.validation_profile_id;
-    const profile = profileId
+    return profileId
       ? validationProfiles().find(p => p.id === profileId && p.is_active)
       : undefined;
+  };
+
+  const isFieldRequired = (fieldName: string): boolean => {
+    return (getActiveProfile()?.field_rules ?? []).some(r => r.field_name === fieldName && r.required);
+  };
+
+  const validateFormData = (data: Record<string, string>): ValidationError[] => {
+    const profile = getActiveProfile();
     if (!profile) return [];
 
     const coerced: Record<string, unknown> = {};
@@ -270,6 +278,8 @@ export function RecordFormPage() {
             updateLineItem={updateLineItem}
             deleteLineItem={deleteLineItem}
             saveNewLineItem={saveNewLineItem}
+            validationErrors={validationErrors()}
+            isFieldRequired={isFieldRequired}
           />
           <div class="form-actions">
             <button type="button" class="btn" onClick={handleCancel}>

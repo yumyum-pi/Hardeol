@@ -101,6 +101,7 @@ type FormFieldWithConfigProp = {
   setFormData: (key: string, value: string) => void,
   isNewRecord: boolean
   config?: FormFieldConfig;
+  isRequired: boolean;
   getFieldValidationErrors: (fileName: string) => ValidationError[];
 }
 export const FormFieldWithConfig = (props: FormFieldWithConfigProp) => {
@@ -123,7 +124,7 @@ export const FormFieldWithConfig = (props: FormFieldWithConfigProp) => {
 
   return (
     <div class={`form-group ${widthClass} ${hasError ? 'has-error' : ''}`}>
-      <label>{label}{props.field.required ? ' *' : ''}</label>
+      <label>{label}{props.isRequired ? ' *' : ''}</label>
       <FieldInputWithConfig
         field={props.field}
         value={fieldValue}

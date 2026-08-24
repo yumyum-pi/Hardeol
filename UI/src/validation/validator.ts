@@ -75,8 +75,17 @@ function validateField(
 ): ValidationError[] {
   const errors: ValidationError[] = [];
 
-  // Skip validation if value is empty and field is not required
-  if (isEmpty(value) && !field.required) {
+  // If the value is empty, either flag it as missing (if required) or skip
+  // the rest of the checks (nothing meaningful to validate on an empty value).
+  if (isEmpty(value)) {
+    if (rule.required) {
+      errors.push({
+        field: rule.field_name,
+        rule_type: 'field',
+        message: rule.error_message || 'This field is required',
+        code: 'REQUIRED',
+      });
+    }
     return errors;
   }
 
