@@ -109,6 +109,8 @@ export interface FormFieldConfig {
   read_only?: boolean;
   default_value?: string;
   width: FieldWidth;
+  // Column configs for TABLE-type fields
+  table_fields?: FormFieldConfig[];
 }
 
 export interface FormView {

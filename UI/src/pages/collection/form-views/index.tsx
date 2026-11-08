@@ -1,8 +1,7 @@
 import { createSignal, For, onMount, Show } from 'solid-js';
 import { useParams, useNavigate } from '@solidjs/router';
 import { api } from '../../../api/client';
-import { useCollectionData } from '../../../hooks/useCollectionData';
-import { ActionType, FormView, ValidationProfile } from '../../../types/collection';
+import { ActionType, FormView } from '../../../types/collection';
 import Header from '../../../components/header';
 
 export function FormViewsPage() {
@@ -10,7 +9,6 @@ export function FormViewsPage() {
   const navigate = useNavigate();
   const name = () => params.name ?? '';
 
-  const { collection, fetchCollection } = useCollectionData(name);
   const [views, setViews] = createSignal<FormView[]>([]);
   const [loading, setLoading] = createSignal(true);
   const [error, setError] = createSignal<string | null>(null);
@@ -23,7 +21,7 @@ export function FormViewsPage() {
 
   onMount(async () => {
     setLoading(true);
-    await Promise.all([fetchCollection(), fetchFormViews()]);
+    await Promise.all([fetchFormViews()]);
     setLoading(false);
   });
 
@@ -36,14 +34,12 @@ export function FormViewsPage() {
     }
   };
 
-  function openEdit(view: FormView): void {
-    // TODO: redirect to the new page
-    throw new Error('Function not implemented.');
+  function openEdit(viewID: number): void {
+    navigate(`/collection/${name()}/form-views/${viewID}`)
   }
 
   function openCreate(): void {
-    // TODO: redirect to the new page
-    throw new Error('Function not implemented.');
+    navigate(`/collection/${name()}/form-views/new`)
   }
 
   const handleDelete = async (view: FormView) => {
@@ -72,9 +68,8 @@ export function FormViewsPage() {
         </div>
       </Header>
 
-      <Show when={!loading() && collection()}>
+      <Show when={!loading()}>
         <div class=" view-list">
-
           <Show when={error()}>
             <div class="error-banner">{error()}</div>
           </Show>
@@ -107,7 +102,7 @@ export function FormViewsPage() {
                       <td >{getActionTypeLabel(view.action_type)}</td>
                       <td >{view.fields.filter(f => f.visible).length} fields</td>
                       <td class="view-actions">
-                        <button class="btn btn-sm" onClick={() => openEdit(view)}>
+                        <button class="btn btn-sm" onClick={() => openEdit(view.id!)}>
                           Edit
                         </button>
                         <button class="btn btn-danger btn-sm" onClick={() => handleDelete(view)}>

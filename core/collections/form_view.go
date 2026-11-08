@@ -16,15 +16,16 @@ const (
 
 // FormFieldConfig represents a single field configuration in a form view
 type FormFieldConfig struct {
-	Name         string  `json:"name"`
-	Order        int     `json:"order"`
-	Visible      bool    `json:"visible"`
-	Label        *string `json:"label,omitempty"`
-	Placeholder  *string `json:"placeholder,omitempty"`
-	HelpText     *string `json:"help_text,omitempty"`
-	ReadOnly     bool    `json:"read_only"`
-	DefaultValue *string `json:"default_value,omitempty"`
-	Width        string  `json:"width"` // "full", "half", "third"
+	Name         string            `json:"name"`
+	Order        int               `json:"order"`
+	Visible      bool              `json:"visible"`
+	Label        *string           `json:"label,omitempty"`
+	Placeholder  *string           `json:"placeholder,omitempty"`
+	HelpText     *string           `json:"help_text,omitempty"`
+	ReadOnly     bool              `json:"read_only"`
+	DefaultValue *string           `json:"default_value,omitempty"`
+	Width        string            `json:"width"`                  // "full", "half", "third"
+	TableFields  []FormFieldConfig `json:"table_fields,omitempty"` // column configs for TABLE-type fields
 }
 
 // FormFieldList is a custom type for storing FormFieldConfig slices in SQLite as JSON

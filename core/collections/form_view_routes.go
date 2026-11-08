@@ -19,6 +19,21 @@ func FormViewRouter(c *Collection) []crudRouterReturnType {
 		db.Where("collection_id = ?", collectionID).Order("name").Find(&views)
 		ctx.ResponseOk(http.StatusOK, views)
 	}
+	handleGetByID := func(ctx *router.Ctx) {
+		formID := ctx.GetParam("formID")
+		if formID == "" {
+			ctx.ResponseError(http.StatusBadRequest, "formID is required")
+			return
+		}
+		db := database.Get()
+		var view FormView
+		db.
+			Where("collection_id = ?", collectionID).
+			Where("id = ?", formID).
+			Order("name").
+			First(&view)
+		ctx.ResponseOk(http.StatusOK, view)
+	}
 
 	handleCreate := func(ctx *router.Ctx) {
 		db := database.Get()
@@ -199,6 +214,7 @@ func FormViewRouter(c *Collection) []crudRouterReturnType {
 
 	return []crudRouterReturnType{
 		{router.MethodGET, basePath, handleList},
+		{router.MethodGET, fmt.Sprintf("%s/:formID", basePath), handleGetByID},
 		{router.MethodPOST, basePath, handleCreate},
 		{router.MethodPUT, fmt.Sprintf("%s/:viewId", basePath), handleUpdate},
 		{router.MethodDELETE, fmt.Sprintf("%s/:viewId", basePath), handleDelete},

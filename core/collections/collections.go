@@ -197,6 +197,7 @@ func UpdateCollectionRoutes(cc Collection, db *gorm.DB, r *router.DynamicRouter)
 	basePath := fmt.Sprintf("/%s/%s", CollectionString, cc.Name)
 
 	// Remove old routes
+	r.Remove(router.MethodGET, basePath+"/schema")
 	r.Remove(router.MethodGET, basePath)
 	r.Remove(router.MethodPOST, basePath)
 	r.Remove(router.MethodPOST, basePath+"/query")
@@ -239,6 +240,22 @@ type crudRouterReturnType struct {
 
 func CRUDRouter(c *Collection) []crudRouterReturnType {
 	t := c.CreateType()
+
+	// handle fetching this collection's schema (fields/sections) in isolation,
+	// since "/collection/:name" can't be used here: every collection already
+	// owns the static "/collection/<name>" route below for listing its records,
+	// and the router always resolves a static match over a param one, so a
+	// generic param route at this path is unreachable for any real collection.
+	handleSchema := func(ctx *router.Ctx) {
+		var col Collection
+		db := database.Get()
+		res := db.Preload("Fields").Preload("Sections").Where("name = ?", c.Name).First(&col)
+		if res.Error != nil {
+			ctx.ResponseError(http.StatusInternalServerError, res.Error.Error())
+			return
+		}
+		ctx.ResponseOk(http.StatusOK, col)
+	}
 
 	// handle list to collection
 	// TODO: add the following
@@ -392,6 +409,12 @@ func CRUDRouter(c *Collection) []crudRouterReturnType {
 	}
 
 	asdf := make([]crudRouterReturnType, 0)
+
+	asdf = append(asdf, crudRouterReturnType{
+		router.MethodGET,
+		fmt.Sprintf("/%s/%s/schema", CollectionString, c.Name),
+		handleSchema,
+	})
 
 	asdf = append(asdf, crudRouterReturnType{
 		router.MethodGET,

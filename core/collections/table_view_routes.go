@@ -22,6 +22,24 @@ func TableViewRouter(c *Collection) []crudRouterReturnType {
 		ctx.ResponseOk(http.StatusOK, views)
 	}
 
+	handleGetByID := func(ctx *router.Ctx) {
+		viewIdStr := ctx.GetParam(PARAM_ID)
+		viewId, err := strconv.Atoi(viewIdStr)
+		if err != nil {
+			ctx.ResponseError(http.StatusBadRequest, "invalid view ID")
+			return
+		}
+
+		db := database.Get()
+		var view TableView
+		if err := db.Where("collection_id = ?", collectionID).First(&view, viewId).Error; err != nil {
+			ctx.ResponseError(http.StatusNotFound, "view not found")
+			return
+		}
+
+		ctx.ResponseOk(http.StatusOK, view)
+	}
+
 	handleCreate := func(ctx *router.Ctx) {
 		db := database.Get()
 
@@ -127,6 +145,7 @@ func TableViewRouter(c *Collection) []crudRouterReturnType {
 
 	return []crudRouterReturnType{
 		{router.MethodGET, basePath, handleList},
+		{router.MethodGET, fmt.Sprintf("%s/:%s", basePath, PARAM_ID), handleGetByID},
 		{router.MethodPOST, basePath, handleCreate},
 		{router.MethodPUT, fmt.Sprintf("%s/:%s", basePath, PARAM_ID), handleUpdate},
 		{router.MethodDELETE, fmt.Sprintf("%s/:%s", basePath, PARAM_ID), handleDelete},
