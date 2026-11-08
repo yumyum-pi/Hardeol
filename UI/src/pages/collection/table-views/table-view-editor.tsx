@@ -1,37 +1,143 @@
-import { createSignal, For, Show } from 'solid-js';
+import { createMemo, createSignal, For, onMount, Show } from 'solid-js';
 import { createStore } from 'solid-js/store';
+import { useParams, useNavigate } from '@solidjs/router';
 import { api } from '../../../api/client';
 import { FilterOperator, FilterRule, SchemaField, TableView, ViewField } from '../../../types/collection';
 import { needsValue, OPERATOR_LABELS, OPERATORS_BY_TYPE } from '../../../utils/filters';
 import { isQuickFilterable } from '../../../utils/quickFilters';
+import Header from '../../../components/header';
 import "./table-view.css";
 
-interface ViewManagerProps {
-  collectionName: string;
-  schemaFields: SchemaField[];
-  views: TableView[];
-  onClose: () => void;
-  onViewsChanged: () => void;
+interface FieldSelection {
+  selected: boolean;
+  order: number;
+  cssClass: string;
 }
 
-export function TableViewManager(props: ViewManagerProps) {
+export function TableViewEditor() {
+  const params = useParams();
+  const navigate = useNavigate();
+  const collectionName = () => params.name ?? '';
+  const viewID = () => params.viewID ?? '';
+
+  const isEdit = createMemo(() => viewID() !== 'new');
+
+  const [schemaFields, setSchemaFields] = createSignal<SchemaField[]>([]);
   const [editingView, setEditingView] = createSignal<TableView | null>(null);
-  const [isCreating, setIsCreating] = createSignal(false);
   const [viewName, setViewName] = createSignal('');
   const [isDefault, setIsDefault] = createSignal(false);
-  const [selectedFields, setSelectedFields] = createStore<Record<string, { selected: boolean; order: number; cssClass: string }>>({});
+  const [selectedFields, setSelectedFields] = createStore<Record<string, FieldSelection>>({});
   const [filterRules, setFilterRules] = createSignal<FilterRule[]>([]);
-  const [visibleFilterFields, setVisibleFilterFields] = createStore<Record<string, { selected: boolean; order: number; cssClass: string }>>({});
+  const [visibleFilterFields, setVisibleFilterFields] = createStore<Record<string, FieldSelection>>({});
   const [error, setError] = createSignal<string | null>(null);
+  const [loading, setLoading] = createSignal(true);
 
-  // Available fields (excluding 'id' since it's always included)
-  const availableFields = () => props.schemaFields.filter(f => f.type !== 'TABLE');
+  // Available fields (excluding TABLE type, which can't be shown as a column)
+  const availableFields = () => schemaFields().filter(f => f.type !== 'TABLE');
 
   // Fields eligible to appear as a user-level quick-filter widget (same eligibility
   // rule as the listing page's quick-filter bar).
-  const filterableFields = () => props.schemaFields.filter(f => isQuickFilterable(f.type));
+  const filterableFields = () => schemaFields().filter(f => isQuickFilterable(f.type));
 
-  const fieldByName = (name: string) => props.schemaFields.find(f => f.name === name);
+  const fieldByName = (name: string) => schemaFields().find(f => f.name === name);
+
+  onMount(async () => {
+    setLoading(true);
+    const collection = await fetchCollection();
+    if (collection) {
+      if (isEdit()) {
+        await fetchView();
+      } else {
+        initializeFieldsForCreate();
+        initializeVisibleFiltersForCreate();
+      }
+    }
+    setLoading(false);
+  });
+
+  const fetchCollection = async () => {
+    const response = await api.listCollections();
+    const collection = response.data?.find(c => c.name === collectionName());
+    if (collection) {
+      setSchemaFields(collection.fields);
+      return collection;
+    }
+    setError(`Collection "${collectionName()}" not found`);
+    return null;
+  };
+
+  const fetchView = async () => {
+    const response = await api.getViewByID(collectionName(), viewID());
+    if (response.data) {
+      setEditingView(response.data);
+      setViewName(response.data.name);
+      setIsDefault(response.data.is_default);
+      setFilterRules(response.data.filters ? [...response.data.filters] : []);
+      initializeFieldsForEdit(response.data);
+      initializeVisibleFiltersForEdit(response.data);
+    } else {
+      setError(response.error ?? 'View not found');
+    }
+  };
+
+  const initializeFieldsForEdit = (view: TableView) => {
+    const initial: Record<string, FieldSelection> = {};
+    availableFields().forEach((f, idx) => {
+      const viewField = view.fields.find(vf => vf.name === f.name);
+      initial[f.name] = {
+        selected: !!viewField,
+        order: viewField?.order ?? idx,
+        cssClass: viewField?.css_class ?? '',
+      };
+    });
+    for (const [key, value] of Object.entries(initial)) {
+      setSelectedFields(key, value);
+    }
+  };
+
+  const initializeFieldsForCreate = () => {
+    const initial: Record<string, FieldSelection> = {};
+    availableFields().forEach((f, idx) => {
+      initial[f.name] = {
+        selected: true,
+        order: idx,
+        cssClass: '',
+      };
+    });
+    for (const [key, value] of Object.entries(initial)) {
+      setSelectedFields(key, value);
+    }
+  };
+
+  const initializeVisibleFiltersForEdit = (view: TableView) => {
+    const initial: Record<string, FieldSelection> = {};
+    filterableFields().forEach((f, idx) => {
+      const vf = view.visible_filters?.find(x => x.name === f.name);
+      initial[f.name] = {
+        selected: !!vf,
+        order: vf?.order ?? idx,
+        cssClass: vf?.css_class ?? '',
+      };
+    });
+    for (const [key, value] of Object.entries(initial)) {
+      setVisibleFilterFields(key, value);
+    }
+  };
+
+  const initializeVisibleFiltersForCreate = () => {
+    const initial: Record<string, FieldSelection> = {};
+    filterableFields().forEach((f, idx) => {
+      initial[f.name] = {
+        // Opt-in: unlike columns, quick filters default OFF until explicitly enabled.
+        selected: false,
+        order: idx,
+        cssClass: '',
+      };
+    });
+    for (const [key, value] of Object.entries(initial)) {
+      setVisibleFilterFields(key, value);
+    }
+  };
 
   const addFilterRule = () => {
     const first = availableFields()[0];
@@ -53,177 +159,11 @@ export function TableViewManager(props: ViewManagerProps) {
     setFilterRules(filterRules().filter((_, i) => i !== index));
   };
 
-  const initializeFieldsForEdit = (view: TableView) => {
-    // Reset all fields
-    const initial: Record<string, { selected: boolean; order: number; cssClass: string }> = {};
-    availableFields().forEach((f, idx) => {
-      const viewField = view.fields.find(vf => vf.name === f.name);
-      initial[f.name] = {
-        selected: !!viewField,
-        order: viewField?.order ?? idx,
-        cssClass: viewField?.css_class ?? '',
-      };
-    });
-    // Use batch update
-    for (const [key, value] of Object.entries(initial)) {
-      setSelectedFields(key, value);
-    }
-  };
-
-  const initializeFieldsForCreate = () => {
-    const initial: Record<string, { selected: boolean; order: number; cssClass: string }> = {};
-    availableFields().forEach((f, idx) => {
-      initial[f.name] = {
-        selected: true,
-        order: idx,
-        cssClass: '',
-      };
-    });
-    for (const [key, value] of Object.entries(initial)) {
-      setSelectedFields(key, value);
-    }
-  };
-
-  const initializeVisibleFiltersForEdit = (view: TableView) => {
-    const initial: Record<string, { selected: boolean; order: number; cssClass: string }> = {};
-    filterableFields().forEach((f, idx) => {
-      const vf = view.visible_filters?.find(x => x.name === f.name);
-      initial[f.name] = {
-        selected: !!vf,
-        order: vf?.order ?? idx,
-        cssClass: vf?.css_class ?? '',
-      };
-    });
-    for (const [key, value] of Object.entries(initial)) {
-      setVisibleFilterFields(key, value);
-    }
-  };
-
-  const initializeVisibleFiltersForCreate = () => {
-    const initial: Record<string, { selected: boolean; order: number; cssClass: string }> = {};
-    filterableFields().forEach((f, idx) => {
-      initial[f.name] = {
-        // Opt-in: unlike columns, quick filters default OFF until explicitly enabled.
-        selected: false,
-        order: idx,
-        cssClass: '',
-      };
-    });
-    for (const [key, value] of Object.entries(initial)) {
-      setVisibleFilterFields(key, value);
-    }
-  };
-
-  const openCreate = () => {
-    setEditingView(null);
-    setIsCreating(true);
-    setViewName('');
-    setIsDefault(false);
-    setFilterRules([]);
-    initializeFieldsForCreate();
-    initializeVisibleFiltersForCreate();
-  };
-
-  const openEdit = (view: TableView) => {
-    setIsCreating(false);
-    setEditingView(view);
-    setViewName(view.name);
-    setIsDefault(view.is_default);
-    setFilterRules(view.filters ? [...view.filters] : []);
-    initializeFieldsForEdit(view);
-    initializeVisibleFiltersForEdit(view);
-  };
-
-  const closeForm = () => {
-    setEditingView(null);
-    setIsCreating(false);
-    setError(null);
-  };
-
-  const handleSave = async () => {
-    setError(null);
-    const name = viewName().trim();
-    if (!name) {
-      setError('View name is required');
-      return;
-    }
-
-    // Build fields array from selected fields
-    const fields: ViewField[] = [];
-    for (const [fieldName, config] of Object.entries(selectedFields)) {
-      if (config.selected) {
-        fields.push({
-          name: fieldName,
-          order: config.order,
-          css_class: config.cssClass || undefined,
-        });
-      }
-    }
-
-    if (fields.length === 0) {
-      setError('At least one field must be selected');
-      return;
-    }
-
-    // Sort by order
-    fields.sort((a, b) => a.order - b.order);
-
-    // Build visible_filters array from selected quick-filter fields (zero is valid, unlike columns)
-    const visibleFilters: ViewField[] = [];
-    for (const [fieldName, config] of Object.entries(visibleFilterFields)) {
-      if (config.selected) {
-        visibleFilters.push({
-          name: fieldName,
-          order: config.order,
-          css_class: config.cssClass || undefined,
-        });
-      }
-    }
-    visibleFilters.sort((a, b) => a.order - b.order);
-
-    const viewData = {
-      name,
-      fields,
-      is_default: isDefault(),
-      filters: filterRules(),
-      visible_filters: visibleFilters,
-    };
-
-    let response;
-    if (isCreating()) {
-      response = await api.createView(props.collectionName, viewData);
-    } else {
-      const view = editingView();
-      if (!view?.id) return;
-      response = await api.updateView(props.collectionName, view.id, viewData);
-    }
-
-    if (response.error) {
-      setError(response.error);
-    } else {
-      closeForm();
-      props.onViewsChanged();
-    }
-  };
-
-  const handleDelete = async (view: TableView) => {
-    if (!view.id) return;
-    if (!confirm(`Delete view "${view.name}"?`)) return;
-
-    const response = await api.deleteView(props.collectionName, view.id);
-    if (response.error) {
-      setError(response.error);
-    } else {
-      props.onViewsChanged();
-    }
-  };
-
   const moveField = (fieldName: string, direction: 'up' | 'down') => {
     const fields = availableFields();
     const currentOrder = selectedFields[fieldName]?.order ?? 0;
     const newOrder = direction === 'up' ? currentOrder - 1 : currentOrder + 1;
 
-    // Find the field that has the target order
     const swapField = fields.find(f => (selectedFields[f.name]?.order ?? 0) === newOrder);
 
     if (swapField) {
@@ -261,48 +201,82 @@ export function TableViewManager(props: ViewManagerProps) {
     });
   };
 
+  const handleSave = async () => {
+    setError(null);
+    const name = viewName().trim();
+    if (!name) {
+      setError('View name is required');
+      return;
+    }
+
+    const fields: ViewField[] = [];
+    for (const [fieldName, config] of Object.entries(selectedFields)) {
+      if (config.selected) {
+        fields.push({
+          name: fieldName,
+          order: config.order,
+          css_class: config.cssClass || undefined,
+        });
+      }
+    }
+
+    if (fields.length === 0) {
+      setError('At least one field must be selected');
+      return;
+    }
+
+    fields.sort((a, b) => a.order - b.order);
+
+    const visibleFilters: ViewField[] = [];
+    for (const [fieldName, config] of Object.entries(visibleFilterFields)) {
+      if (config.selected) {
+        visibleFilters.push({
+          name: fieldName,
+          order: config.order,
+          css_class: config.cssClass || undefined,
+        });
+      }
+    }
+    visibleFilters.sort((a, b) => a.order - b.order);
+
+    const viewData = {
+      name,
+      fields,
+      is_default: isDefault(),
+      filters: filterRules(),
+      visible_filters: visibleFilters,
+    };
+
+    let response;
+    if (isEdit()) {
+      const view = editingView();
+      if (!view?.id) return;
+      response = await api.updateView(collectionName(), view.id, viewData);
+    } else {
+      response = await api.createView(collectionName(), viewData);
+    }
+
+    if (response.error) {
+      setError(response.error);
+    } else {
+      navigate(`/collection/${collectionName()}/table-views`);
+    }
+  };
+
   return (
-    <div class="split-view">
-      <div class="view-manager-modal card non-click height-full">
+    <div class="table-view-editor-page">
+      <Header
+        back={true}
+        title={`${isEdit() ? 'Edit' : 'New'} Table View: ${collectionName()}`}
+      >
+      </Header>
+
+      <Show when={!loading()}>
         <Show when={error()}>
           <div class="error-banner">{error()}</div>
         </Show>
 
-        <div class="view-list">
-          <Show when={props.views.length === 0}>
-            <p class="empty-text">No saved views yet</p>
-          </Show>
-          <For each={props.views}>
-            {(view) => (
-              <div class="view-item">
-                <span class="view-name">
-                  {view.name}
-                  <Show when={view.is_default}>
-                    <span class="default-badge">Default</span>
-                  </Show>
-                </span>
-                <span class="view-field-count">{view.fields.length} fields</span>
-                <div class="view-actions">
-                  <button class="btn btn-sm" onClick={() => openEdit(view)}>
-                    Edit
-                  </button>
-                  <button class="btn btn-danger btn-sm" onClick={() => handleDelete(view)}>
-                    Delete
-                  </button>
-                </div>
-              </div>
-            )}
-          </For>
-        </div>
-
-        <div class="form-actions">
-          <button class="btn btn-primary" onClick={openCreate}>
-            + New View
-          </button>
-        </div>
-      </div>
-      <Show when={isCreating() || editingView()}>
-        <form class="card non-click height-full" onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
+        <form class="card non-click" onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
           <div class="form-group">
             <label>View Name</label>
             <input
@@ -339,7 +313,7 @@ export function TableViewManager(props: ViewManagerProps) {
                 <tbody>
                   <For each={sortedAvailableFields()}>
                     {(field, index) => (
-                      <tr >
+                      <tr>
                         <td>
                           <input
                             type="checkbox"
@@ -533,11 +507,8 @@ export function TableViewManager(props: ViewManagerProps) {
           </div>
 
           <div class="form-actions">
-            <button type="button" class="btn" onClick={closeForm}>
-              Cancel
-            </button>
             <button type="submit" class="btn btn-primary">
-              {isCreating() ? 'Create View' : 'Save Changes'}
+              {isEdit() ? 'Save Changes' : 'Create View'}
             </button>
           </div>
         </form>

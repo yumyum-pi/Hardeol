@@ -22,7 +22,7 @@ func TestNew(t *testing.T) {
 
 func TestAddField(t *testing.T) {
 	// Add a dummy field
-	f := collections.NewSchemaField("DummyValue", "TEXT", true, "")
+	f := collections.NewSchemaField("DummyValue", "TEXT", "")
 	c := collections.New("testcollections", *f)
 	if len(c.Fields) != 1 {
 		t.Errorf("expected Fields length to be 1 after adding a field, got %d", len(c.Fields))
@@ -31,8 +31,8 @@ func TestAddField(t *testing.T) {
 
 func TestCreateType(t *testing.T) {
 	// Add a dummy field
-	f := collections.NewSchemaField("DummyText", "TEXT", true, "")
-	n := collections.NewSchemaField("DummyNumber", "NUMBER", true, "")
+	f := collections.NewSchemaField("DummyText", "TEXT", "")
+	n := collections.NewSchemaField("DummyNumber", "NUMBER", "")
 	c := collections.New("testcollections", *f, *n)
 	if len(c.Fields) != 2 {
 		t.Errorf("expected Fields length to be 1 after adding a field, got %d", len(c.Fields))
@@ -50,8 +50,8 @@ func TestCreateType(t *testing.T) {
 }
 
 func TestCreate(t *testing.T) {
-	f := collections.NewSchemaField("DummyText", "TEXT", true, "")
-	n := collections.NewSchemaField("DummyNumber", "NUMBER", true, "")
+	f := collections.NewSchemaField("DummyText", "TEXT", "")
+	n := collections.NewSchemaField("DummyNumber", "NUMBER", "")
 
 	c := collections.New("testcollections", *f, *n)
 	j := `
@@ -85,8 +85,8 @@ func TestCreate(t *testing.T) {
 
 func TestDBInit(t *testing.T) {
 	database.InitSqlite()
-	f := collections.NewSchemaField("DummyText", "TEXT", true, "")
-	n := collections.NewSchemaField("DummyNumber", "NUMBER", true, "")
+	f := collections.NewSchemaField("DummyText", "TEXT", "")
+	n := collections.NewSchemaField("DummyNumber", "NUMBER", "")
 
 	db := database.Get()
 	c := collections.New("testcollections", *f, *n)

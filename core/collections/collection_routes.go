@@ -352,9 +352,6 @@ func createChildTable(db *gorm.DB, tableName string, field SchemaField) error {
 	for _, f := range field.TableFields {
 		sqlType := fieldTypeToSQLType(f.Type)
 		colDef := "\"" + f.Name + "\" " + sqlType
-		if f.Required {
-			colDef += " NOT NULL"
-		}
 		columns = append(columns, colDef)
 	}
 

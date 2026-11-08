@@ -232,6 +232,7 @@ func convertProfile(p ValidationProfile) validation.Profile {
 	for i, r := range p.FieldRules {
 		fieldRules[i] = validation.FieldRule{
 			FieldName:    r.FieldName,
+			Required:     r.Required,
 			MinLength:    r.MinLength,
 			MaxLength:    r.MaxLength,
 			Regex:        r.Regex,
@@ -309,7 +310,6 @@ func convertFields(fields map[string]SchemaField) map[string]validation.Field {
 		result[name] = validation.Field{
 			Name:          f.Name,
 			Type:          string(f.Type),
-			Required:      f.Required,
 			SelectOptions: f.SelectOptions,
 			SectionID:     f.SectionID,
 		}

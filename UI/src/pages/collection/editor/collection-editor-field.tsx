@@ -29,7 +29,7 @@ export const SchemaFieldEditor = (props: SchemaEditorFieldProps) => {
             const newType = e.currentTarget.value as FieldType;
             props.onUpdate('type', newType);
             if (newType === 'TABLE' && (!props.field.table_fields || props.field.table_fields.length === 0)) {
-              props.onUpdate('table_fields', [{ name: '', type: 'TEXT', required: false }]);
+              props.onUpdate('table_fields', [{ name: '', type: 'TEXT' }]);
             }
           }}
           class="field-type-select"
@@ -59,15 +59,6 @@ export const SchemaFieldEditor = (props: SchemaEditorFieldProps) => {
             class="field-options-input"
           />
         </Show>
-
-        <label class="checkbox-label">
-          <input
-            type="checkbox"
-            checked={props.field.required}
-            onChange={(e) => props.onUpdate('required', e.currentTarget.checked)}
-          />
-          Required
-        </label>
       </div>
 
       <Show when={props.field.type === 'TABLE'}>

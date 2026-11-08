@@ -62,8 +62,8 @@ func ComputeSchemaDiff(oldFields, newFields []SchemaField) SchemaDiff {
 			continue
 		}
 		if oldField, exists := oldMap[newField.Name]; exists {
-			// Check if field was modified (type or required changed)
-			if oldField.Type != newField.Type || oldField.Required != newField.Required {
+			// Check if field was modified (type changed)
+			if oldField.Type != newField.Type {
 				diff.Modified = append(diff.Modified, SchemaFieldChange{
 					OldField: oldField,
 					NewField: newField,
@@ -205,8 +205,6 @@ func createTable(db *gorm.DB, tableName string, fields []SchemaField) error {
 
 		if field.Name == "id" {
 			colDef += " PRIMARY KEY AUTOINCREMENT"
-		} else if field.Required {
-			colDef += " NOT NULL"
 		}
 
 		columns = append(columns, colDef)

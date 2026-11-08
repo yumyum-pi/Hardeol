@@ -16,15 +16,16 @@ const (
 
 // FormFieldConfig represents a single field configuration in a form view
 type FormFieldConfig struct {
-	Name         string  `json:"name"`
-	Order        int     `json:"order"`
-	Visible      bool    `json:"visible"`
-	Label        *string `json:"label,omitempty"`
-	Placeholder  *string `json:"placeholder,omitempty"`
-	HelpText     *string `json:"help_text,omitempty"`
-	ReadOnly     bool    `json:"read_only"`
-	DefaultValue *string `json:"default_value,omitempty"`
-	Width        string  `json:"width"` // "full", "half", "third"
+	Name         string            `json:"name"`
+	Order        int               `json:"order"`
+	Visible      bool              `json:"visible"`
+	Label        *string           `json:"label,omitempty"`
+	Placeholder  *string           `json:"placeholder,omitempty"`
+	HelpText     *string           `json:"help_text,omitempty"`
+	ReadOnly     bool              `json:"read_only"`
+	DefaultValue *string           `json:"default_value,omitempty"`
+	Width        string            `json:"width"`                  // "full", "half", "third"
+	TableFields  []FormFieldConfig `json:"table_fields,omitempty"` // column configs for TABLE-type fields
 }
 
 // FormFieldList is a custom type for storing FormFieldConfig slices in SQLite as JSON
@@ -60,10 +61,11 @@ func (f *FormFieldList) Scan(value interface{}) error {
 
 // FormView represents a saved form view configuration for a collection
 type FormView struct {
-	ID           int           `json:"id" gorm:"primaryKey;autoIncrement"`
-	Name         string        `json:"name"`
-	CollectionID int           `json:"collection_id"`
-	ActionType   ActionType    `json:"action_type"`
-	Fields       FormFieldList `json:"fields" gorm:"type:TEXT"`
-	IsDefault    bool          `json:"is_default"`
+	ID                  int           `json:"id" gorm:"primaryKey;autoIncrement"`
+	Name                string        `json:"name"`
+	CollectionID        int           `json:"collection_id"`
+	ActionType          ActionType    `json:"action_type"`
+	Fields              FormFieldList `json:"fields" gorm:"type:TEXT"`
+	IsDefault           bool          `json:"is_default"`
+	ValidationProfileID *int          `json:"validation_profile_id,omitempty"`
 }

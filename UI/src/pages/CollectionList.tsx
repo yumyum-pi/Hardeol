@@ -33,7 +33,7 @@ export function CollectionList(props: CollectionListProps) {
           </div>
         }>
           {(collection) => (
-            <A href={`/collection/${collection.name}`} class="card">
+            <A href={`/collection/${collection.id}`} class="card">
               <div class="card-header">
                 <h3>{collection.name}</h3>
               </div>

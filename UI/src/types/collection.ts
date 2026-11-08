@@ -2,7 +2,6 @@
 export interface Field {
   name: string;
   type: FieldType;
-  required: boolean;
   select_options?: string[];
   select_options_text?: string;
   order?: number;
@@ -23,7 +22,6 @@ export interface SchemaField {
   id?: number;
   name: string;
   type: FieldType;
-  required: boolean;
   select_options?: string[]; // For SELECT type
   collection_id?: number;
   section_id?: number | null; // Reference to section (from DB)
@@ -111,6 +109,8 @@ export interface FormFieldConfig {
   read_only?: boolean;
   default_value?: string;
   width: FieldWidth;
+  // Column configs for TABLE-type fields
+  table_fields?: FormFieldConfig[];
 }
 
 export interface FormView {
@@ -120,11 +120,13 @@ export interface FormView {
   action_type: ActionType;
   fields: FormFieldConfig[];
   is_default: boolean;
+  validation_profile_id?: number | null;
 }
 
 // Validation Types
 export interface FieldRule {
   field_name: string;
+  required?: boolean;
   min_length?: number;
   max_length?: number;
   regex?: string;

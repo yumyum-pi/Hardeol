@@ -86,30 +86,27 @@ type SchemaField struct {
 	Name          string          `json:"name"`
 	Type          SchemaFieldType `json:"type"`
 	Regex         string          `json:"regex,omitempty"`                           // optional regex validation
-	Required      bool            `json:"required"`
 	SelectOptions StringSlice     `json:"select_options,omitempty" gorm:"type:TEXT"` // For SELECT type
 	ID            int             `json:"id" gorm:"autoIncrement"`
-	CollectionID  int             `json:"collection_id"`                             // foreign key to the Collection
-	SectionID     *int            `json:"section_id,omitempty"`                      // nullable reference to section
-	SectionIndex  *int            `json:"section_index,omitempty" gorm:"-"`          // section index from frontend (not stored in DB)
-	Order         int             `json:"order"`                                     // field ordering within section
-	TableFields   SchemaFieldList `json:"table_fields,omitempty" gorm:"type:TEXT"`  // nested fields for TABLE type
+	CollectionID  int             `json:"collection_id"`                           // foreign key to the Collection
+	SectionID     *int            `json:"section_id,omitempty"`                    // nullable reference to section
+	SectionIndex  *int            `json:"section_index,omitempty" gorm:"-"`        // section index from frontend (not stored in DB)
+	Order         int             `json:"order"`                                   // field ordering within section
+	TableFields   SchemaFieldList `json:"table_fields,omitempty" gorm:"type:TEXT"` // nested fields for TABLE type
 }
 
-func NewSchemaField(name, fieldType string, required bool, regex string) *SchemaField {
+func NewSchemaField(name, fieldType string, regex string) *SchemaField {
 	return &SchemaField{
-		Name:     name,
-		Type:     SchemaFieldType(fieldType),
-		Regex:    regex,
-		Required: required,
+		Name:  name,
+		Type:  SchemaFieldType(fieldType),
+		Regex: regex,
 	}
 }
 
 func DefaultIDSchemeField() SchemaField {
 	return SchemaField{
-		Name:     "id",
-		Type:     FieldNumber,
-		Required: false,
+		Name: "id",
+		Type: FieldNumber,
 		// Regex is empty so it should be omitted
 	}
 }

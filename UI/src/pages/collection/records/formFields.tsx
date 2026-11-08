@@ -1,4 +1,4 @@
-import { createSignal, For, Match, Show, Switch } from "solid-js";
+import { For, Match, Show, Switch } from "solid-js";
 import { createStore } from "solid-js/store";
 import { FormFieldWithConfig } from "../../../components/FieldInput";
 import { Collection, FormActionType, FormFieldConfig, FormView, LineItem, SchemaField, Section, ValidationError } from "../../../types/collection";
@@ -136,15 +136,16 @@ type FormFieldProps = {
   updateLineItem: (fieldName: string, index: number, key: string, value: unknown, isNewRecord: boolean) => void;
   deleteLineItem: (fieldName: string, index: number, isNewRecord: boolean) => void;
   saveNewLineItem: (fieldName: string, index: number) => void;
+  validationErrors: ValidationError[];
+  isFieldRequired: (fieldName: string) => boolean;
 }
 // Render form fields (for add/edit modals)
 export const FormFields = (props: FormFieldProps) => {
 
-  const [validationErrors, setValidationErrors] = createSignal<ValidationError[]>([]);
   const [collapsedSections, setCollapsedSections] = createStore<Record<number, boolean>>({});
   const {
     formData, setFormData, isNewRecord, getSections, getFieldsForSection, getTableFields, getActiveFormView, collection,
-    lineItems, newLineItems, addLineItem, updateLineItem, deleteLineItem, saveNewLineItem,
+    lineItems, newLineItems, addLineItem, updateLineItem, deleteLineItem, saveNewLineItem, isFieldRequired,
   } = props;
 
   const toggleSection = (sectionId: number) => {
@@ -185,7 +186,7 @@ export const FormFields = (props: FormFieldProps) => {
 
 
   const getFieldValidationErrors = (fieldName: string): ValidationError[] => {
-    return getFieldErrors(validationErrors(), fieldName);
+    return getFieldErrors(props.validationErrors, fieldName);
   };
 
   // If no sections, render flat list with form grid
@@ -198,7 +199,7 @@ export const FormFields = (props: FormFieldProps) => {
       <>
         <div class={activeView ? 'form-grid' : ''}>
           <For each={visibleFields}>
-            {(field) => <FormFieldWithConfig field={field} formData={formData} setFormData={setFormData} isNewRecord={isNewRecord} getFieldValidationErrors={getFieldValidationErrors} />}
+            {(field) => <FormFieldWithConfig field={field} formData={formData} setFormData={setFormData} isNewRecord={isNewRecord} isRequired={isFieldRequired(field.name)} getFieldValidationErrors={getFieldValidationErrors} />}
           </For>
         </div>
         <Show when={hasTableFields}>
@@ -236,7 +237,7 @@ export const FormFields = (props: FormFieldProps) => {
           </div>
           <div class={`record-section-content ${activeView ? 'form-grid' : ''}`}>
             <For each={visibleUnsectionedFields}>
-              {(field) => <FormFieldWithConfig field={field} formData={formData} setFormData={setFormData} isNewRecord={isNewRecord} getFieldValidationErrors={getFieldValidationErrors} />}
+              {(field) => <FormFieldWithConfig field={field} formData={formData} setFormData={setFormData} isNewRecord={isNewRecord} isRequired={isFieldRequired(field.name)} getFieldValidationErrors={getFieldValidationErrors} />}
             </For>
           </div>
         </div>
@@ -259,7 +260,7 @@ export const FormFields = (props: FormFieldProps) => {
                 <Show when={!isCollapsed()}>
                   <div class={`record-section-content ${activeView ? 'form-grid' : ''}`}>
                     <For each={visibleSectionFields}>
-                      {(field) => <FormFieldWithConfig field={field} formData={formData} setFormData={setFormData} isNewRecord={isNewRecord} getFieldValidationErrors={getFieldValidationErrors} />}
+                      {(field) => <FormFieldWithConfig field={field} formData={formData} setFormData={setFormData} isNewRecord={isNewRecord} isRequired={isFieldRequired(field.name)} getFieldValidationErrors={getFieldValidationErrors} />}
                     </For>
                   </div>
                 </Show>

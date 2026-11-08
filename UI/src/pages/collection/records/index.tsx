@@ -71,32 +71,38 @@ export function RecordFormPage() {
     return formViews().filter(v => v.action_type === at || v.action_type === 'ALL');
   };
 
+  const getActiveProfile = (): ValidationProfile | undefined => {
+    const view = getActiveFormView(actionType());
+    const profileId = view?.validation_profile_id;
+    return profileId
+      ? validationProfiles().find(p => p.id === profileId && p.is_active)
+      : undefined;
+  };
+
+  const isFieldRequired = (fieldName: string): boolean => {
+    return (getActiveProfile()?.field_rules ?? []).some(r => r.field_name === fieldName && r.required);
+  };
+
   const validateFormData = (data: Record<string, string>): ValidationError[] => {
-    const profiles = validationProfiles().filter(p =>
-      p.is_active && (p.action_type === actionType() || p.action_type === 'ALL')
-    );
-    if (profiles.length === 0) return [];
+    const profile = getActiveProfile();
+    if (!profile) return [];
 
     const coerced: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(data)) {
       coerced[key] = coerceFieldValue(fieldsMap().get(key), value);
     }
 
-    let allErrors: ValidationError[] = [];
-    for (const profile of profiles) {
-      const result = validateRecord(
-        {
-          field_rules: profile.field_rules,
-          section_rules: profile.section_rules,
-          collection_rules: profile.collection_rules,
-        },
-        fieldsMap(),
-        coerced,
-        actionType()
-      );
-      allErrors = [...allErrors, ...result.errors];
-    }
-    return allErrors;
+    const result = validateRecord(
+      {
+        field_rules: profile.field_rules,
+        section_rules: profile.section_rules,
+        collection_rules: profile.collection_rules,
+      },
+      fieldsMap(),
+      coerced,
+      actionType()
+    );
+    return result.errors;
   };
 
   const loadLineItems = async (id: number) => {
@@ -272,6 +278,8 @@ export function RecordFormPage() {
             updateLineItem={updateLineItem}
             deleteLineItem={deleteLineItem}
             saveNewLineItem={saveNewLineItem}
+            validationErrors={validationErrors()}
+            isFieldRequired={isFieldRequired}
           />
           <div class="form-actions">
             <button type="button" class="btn" onClick={handleCancel}>

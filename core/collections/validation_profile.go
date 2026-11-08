@@ -7,20 +7,21 @@ import (
 
 // FieldRule represents validation rules for a specific field
 type FieldRule struct {
-	FieldName    string  `json:"field_name"`
-	MinLength    *int    `json:"min_length,omitempty"`
-	MaxLength    *int    `json:"max_length,omitempty"`
-	Regex        *string `json:"regex,omitempty"`
+	FieldName    string   `json:"field_name"`
+	Required     bool     `json:"required,omitempty"`
+	MinLength    *int     `json:"min_length,omitempty"`
+	MaxLength    *int     `json:"max_length,omitempty"`
+	Regex        *string  `json:"regex,omitempty"`
 	Min          *float64 `json:"min,omitempty"`
 	Max          *float64 `json:"max,omitempty"`
-	IntegerOnly  bool    `json:"integer_only,omitempty"`
-	MinDate      *string `json:"min_date,omitempty"`
-	MaxDate      *string `json:"max_date,omitempty"`
-	MinRows      *int    `json:"min_rows,omitempty"`
-	MaxRows      *int    `json:"max_rows,omitempty"`
-	JSONSchema   *string `json:"json_schema,omitempty"`
-	CustomExpr   *string `json:"custom_expr,omitempty"`
-	ErrorMessage *string `json:"error_message,omitempty"`
+	IntegerOnly  bool     `json:"integer_only,omitempty"`
+	MinDate      *string  `json:"min_date,omitempty"`
+	MaxDate      *string  `json:"max_date,omitempty"`
+	MinRows      *int     `json:"min_rows,omitempty"`
+	MaxRows      *int     `json:"max_rows,omitempty"`
+	JSONSchema   *string  `json:"json_schema,omitempty"`
+	CustomExpr   *string  `json:"custom_expr,omitempty"`
+	ErrorMessage *string  `json:"error_message,omitempty"`
 }
 
 // FieldRuleList is a custom type for storing FieldRule slices in SQLite as JSON
@@ -57,7 +58,7 @@ func (f *FieldRuleList) Scan(value interface{}) error {
 // ConditionalRule represents a conditional dependency between fields
 type ConditionalRule struct {
 	IfField       string  `json:"if_field"`
-	IfCondition   string  `json:"if_condition"`   // "filled", "empty", "equals", "not_equals"
+	IfCondition   string  `json:"if_condition"` // "filled", "empty", "equals", "not_equals"
 	IfValue       *string `json:"if_value,omitempty"`
 	ThenField     string  `json:"then_field"`
 	ThenCondition string  `json:"then_condition"` // "required", "filled", "empty"
@@ -66,12 +67,12 @@ type ConditionalRule struct {
 
 // SectionRule represents validation rules for a section
 type SectionRule struct {
-	SectionID        int               `json:"section_id"`
-	MinFieldsFilled  *int              `json:"min_fields_filled,omitempty"`
-	MaxFieldsFilled  *int              `json:"max_fields_filled,omitempty"`
-	Conditions       []ConditionalRule `json:"conditions,omitempty"`
-	CustomExpr       *string           `json:"custom_expr,omitempty"`
-	ErrorMessage     *string           `json:"error_message,omitempty"`
+	SectionID       int               `json:"section_id"`
+	MinFieldsFilled *int              `json:"min_fields_filled,omitempty"`
+	MaxFieldsFilled *int              `json:"max_fields_filled,omitempty"`
+	Conditions      []ConditionalRule `json:"conditions,omitempty"`
+	CustomExpr      *string           `json:"custom_expr,omitempty"`
+	ErrorMessage    *string           `json:"error_message,omitempty"`
 }
 
 // SectionRuleList is a custom type for storing SectionRule slices in SQLite as JSON

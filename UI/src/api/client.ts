@@ -34,6 +34,9 @@ export const api = {
   listCollections: () =>
     request<Collection[]>('/collection'),
 
+  getCollectionSchema: (collectionName: string) =>
+    request<Collection>(`/collection/${collectionName}/schema`),
+
   createCollection: (data: CreateCollectionRequest) =>
     request<Collection>('/collection', {
       method: 'POST',
@@ -84,6 +87,9 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
+  getViewByID: (collectionName: string, viewId: string) =>
+    request<TableView>(`/collection/${collectionName}/table-views/${viewId}`),
+
   updateView: (collectionName: string, viewId: number, data: Omit<TableView, 'id' | 'collection_id'>) =>
     request<TableView>(`/collection/${collectionName}/table-views/${viewId}`, {
       method: 'PUT',
@@ -104,6 +110,9 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+
+  getFormViewByID: (collectionName: string, formID: string) =>
+    request<FormView>(`/collection/${collectionName}/form-views/${formID}`),
 
   updateFormView: (collectionName: string, viewId: number, data: Omit<FormView, 'id' | 'collection_id'>) =>
     request<FormView>(`/collection/${collectionName}/form-views/${viewId}`, {
