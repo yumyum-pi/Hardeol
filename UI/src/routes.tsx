@@ -20,10 +20,8 @@ const AppRouter = () => (
     <Route path="/collection/:name/records/new" component={RecordFormPage} />
     <Route path="/collection/:name/records/:id/edit" component={RecordFormPage} />
     <Route path="/collection/:name/table-views" component={TableViewsPage} />
-    <Route path="/collection/:name/table-views/new" component={TableViewEditor} />
     <Route path="/collection/:name/table-views/:viewID" component={TableViewEditor} />
     <Route path="/collection/:name/form-views" component={FormViewsPage} />
-    <Route path="/collection/:name/form-views/new" component={FormViewEditor} />
     <Route path="/collection/:name/form-views/:formID" component={FormViewEditor} />
     <Route path="/collection/:name/manage-validation" component={ValidationPage} />
     <Route path="*404" component={NotFound} />
