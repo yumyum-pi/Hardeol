@@ -9,86 +9,87 @@ type FieldInputWithConfig = {
   readOnly: boolean
 }
 
+// Each prop is read directly (never destructured into a const) so that
+// changes driven by the active form view's config keep updating this
+// input — Solid only tracks reads that happen inside JSX, not plain
+// top-of-function destructuring.
 const FieldInputWithConfig = (
   props: FieldInputWithConfig
 ) => {
-  const { field, value, onChange, placeholder = '', readOnly = false } = props;
-  const fieldType = field.type;
-
   return (
     <Switch fallback={
       <input
         type="text"
-        value={value}
-        onInput={(e) => onChange(e.currentTarget.value)}
-        placeholder={placeholder}
-        disabled={readOnly}
+        value={props.value}
+        onInput={(e) => props.onChange(e.currentTarget.value)}
+        placeholder={props.placeholder}
+        disabled={props.readOnly}
       />
     }>
-      <Match when={fieldType === 'NUMBER'}>
+      <Match when={props.field.type === 'NUMBER'}>
         <input
           type="number"
-          value={value}
-          onInput={(e) => onChange(e.currentTarget.value)}
-          placeholder={placeholder}
-          disabled={readOnly}
+          value={props.value}
+          onInput={(e) => props.onChange(e.currentTarget.value)}
+          placeholder={props.placeholder}
+          disabled={props.readOnly}
         />
       </Match>
-      <Match when={fieldType === 'BOOL'}>
+      <Match when={props.field.type === 'BOOL'}>
         <select
-          value={value === 'true' || value === '1' ? 'true' : 'false'}
-          onChange={(e) => onChange(e.currentTarget.value)}
-          disabled={readOnly}
+          value={props.value === 'true' || props.value === '1' ? 'true' : 'false'}
+          onChange={(e) => props.onChange(e.currentTarget.value)}
+          disabled={props.readOnly}
         >
           <option value="false">False</option>
           <option value="true">True</option>
         </select>
       </Match>
-      <Match when={fieldType === 'SELECT'}>
+      <Match when={props.field.type === 'SELECT'}>
         <select
-          value={value}
-          onChange={(e) => onChange(e.currentTarget.value)}
-          disabled={readOnly}
+          value={props.value}
+          onChange={(e) => props.onChange(e.currentTarget.value)}
+          disabled={props.readOnly}
         >
-          <option value="">{placeholder || '-- Select --'}</option>
-          <For each={field.select_options || []}>
+          <option value="">{props.placeholder || '-- Select --'}</option>
+          <For each={props.field.select_options || []}>
             {(option) => <option value={option}>{option}</option>}
           </For>
         </select>
       </Match>
-      <Match when={fieldType === 'DATE'}>
+      <Match when={props.field.type === 'DATE'}>
         <input
           type="date"
-          value={value}
-          onInput={(e) => onChange(e.currentTarget.value)}
-          disabled={readOnly}
+          value={props.value}
+          onInput={(e) => props.onChange(e.currentTarget.value)}
+          disabled={props.readOnly}
         />
       </Match>
-      <Match when={fieldType === 'EMAIL'}>
+      <Match when={props.field.type === 'EMAIL'}>
         <input
           type="email"
-          value={value}
-          onInput={(e) => onChange(e.currentTarget.value)}
-          placeholder={placeholder}
-          disabled={readOnly}
+          value={props.value}
+          onInput={(e) => props.onChange(e.currentTarget.value)}
+          placeholder={props.placeholder}
+          disabled={props.readOnly}
         />
       </Match>
-      <Match when={fieldType === 'URL'}>
+      <Match when={props.field.type === 'URL'}>
         <input
           type="url"
-          placeholder={placeholder || 'https://...'}
-          value={value}
-          onInput={(e) => onChange(e.currentTarget.value)}
-          disabled={readOnly}
+          placeholder={props.placeholder || 'https://...'}
+          value={props.value}
+          onInput={(e) => props.onChange(e.currentTarget.value)}
+          disabled={props.readOnly}
         />
       </Match>
-      <Match when={fieldType === 'JSON'}>
+      <Match when={props.field.type === 'JSON'}>
         <textarea
-          placeholder={placeholder || '{"key": "value"}'}
-          value={value}
-          onInput={(e) => onChange(e.currentTarget.value)}
+          placeholder={props.placeholder || '{"key": "value"}'}
+          value={props.value}
+          onInput={(e) => props.onChange(e.currentTarget.value)}
           rows={3}
-          disabled={readOnly}
+          disabled={props.readOnly}
         />
       </Match>
     </Switch>
@@ -105,41 +106,26 @@ type FormFieldWithConfigProp = {
   getFieldValidationErrors: (fileName: string) => ValidationError[];
 }
 export const FormFieldWithConfig = (props: FormFieldWithConfigProp) => {
-  // Skip hidden fields
-  if (props.config && !props.config.visible) return null;
-
-  const label = props.config?.label || props.field.name;
-  const placeholder = props.config?.placeholder || '';
-  const helpText = props.config?.help_text || '';
-  const isReadOnly = props.config?.read_only ?? false;
-  const widthClass = props.config?.width ? `width-${props.config.width}` : 'width-full';
-
-  // Apply default value for new records
-  const fieldValue = props.formData[props.field.name] || (props.isNewRecord && props.config?.default_value) || '';
-
-  const onUpdate = (v: string) => props.setFormData(props.field.name, v)
-  // Get field validation errors
-  const fieldErrors = props.getFieldValidationErrors(props.field.name);
-  const hasError = fieldErrors.length > 0;
-
   return (
-    <div class={`form-group ${widthClass} ${hasError ? 'has-error' : ''}`}>
-      <label>{label}{props.isRequired ? ' *' : ''}</label>
-      <FieldInputWithConfig
-        field={props.field}
-        value={fieldValue}
-        onChange={onUpdate}
-        placeholder={placeholder}
-        readOnly={isReadOnly}
-      />
-      <Show when={helpText && !hasError}>
-        <div class="form-help-text">{helpText}</div>
-      </Show>
-      <Show when={hasError}>
-        <For each={fieldErrors}>
-          {(err) => <div class="field-error">{err.message}</div>}
-        </For>
-      </Show>
-    </div>
+    <Show when={!props.config || props.config.visible}>
+      <div class={`form-group width-${props.config?.width ?? 'full'} ${props.getFieldValidationErrors(props.field.name).length > 0 ? 'has-error' : ''}`}>
+        <label>{props.config?.label || props.field.name}{props.isRequired ? ' *' : ''}</label>
+        <FieldInputWithConfig
+          field={props.field}
+          value={props.formData[props.field.name] || (props.isNewRecord && props.config?.default_value) || ''}
+          onChange={(v) => props.setFormData(props.field.name, v)}
+          placeholder={props.config?.placeholder || ''}
+          readOnly={props.config?.read_only ?? false}
+        />
+        <Show when={props.config?.help_text && props.getFieldValidationErrors(props.field.name).length === 0}>
+          <div class="form-help-text">{props.config?.help_text}</div>
+        </Show>
+        <Show when={props.getFieldValidationErrors(props.field.name).length > 0}>
+          <For each={props.getFieldValidationErrors(props.field.name)}>
+            {(err) => <div class="field-error">{err.message}</div>}
+          </For>
+        </Show>
+      </div>
+    </Show>
   );
 }
